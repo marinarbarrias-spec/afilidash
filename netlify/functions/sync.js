@@ -88,6 +88,51 @@ const atualizarControl = async (conta_id, plataforma, ultima_data, registros) =>
   }
 };
 
+// ── HELPER: busca em lotes por IN (PostgREST limita tamanho de URL) ──
+// Usado para comparar order_ids recebidos contra o que já existe no Supabase,
+// evitando regravar (upsert) pedidos que não mudaram nada.
+const buscarExistentesPorOrderId = async (orderIds, LOTE = 200) => {
+  const mapa = {}; // order_id -> { status, comissao_bruta, venda_total, venda_direta }
+  for (let i = 0; i < orderIds.length; i += LOTE) {
+    const lote = orderIds.slice(i, i + LOTE);
+    const filtro = lote.map(id => `"${String(id).replace(/"/g,'\\"')}"`).join(',');
+    try {
+      const res = await fetch(
+        `${base()}/shopee_pedidos?order_id=in.(${filtro})&select=order_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link`,
+        {
+          headers: {
+            'apikey':        SUPA_KEY(),
+            'Authorization': `Bearer ${SUPA_KEY()}`,
+          },
+        }
+      );
+      if (!res.ok) continue; // se a query de comparação falhar, segue sem otimizar este lote (será regravado, sem perda de dados)
+      const rows = await res.json();
+      (rows || []).forEach(r => { mapa[r.order_id] = r; });
+    } catch(e) {
+      console.warn('Falha ao buscar existentes para comparação (lote ' + i + '):', e.message);
+      // Não interrompe o processo — pedidos deste lote simplesmente não serão otimizados, mas continuam sendo salvos
+    }
+  }
+  return mapa;
+};
+
+// Compara um pedido recebido com o que já existe no banco.
+// Retorna true se precisa gravar (é novo OU algum campo relevante mudou).
+const TOLERANCIA_VALOR = 0.005; // meio centavo — evita falso positivo por arredondamento de float
+const pedidoMudou = (novo, existente) => {
+  if (!existente) return true; // não existe ainda → é novo, grava
+  if ((novo.status || '') !== (existente.status || '')) return true;
+  if (Math.abs((Number(novo.comissao_bruta)||0) - (Number(existente.comissao_bruta)||0)) > TOLERANCIA_VALOR) return true;
+  if (Math.abs((Number(novo.venda_total)||0) - (Number(existente.venda_total)||0)) > TOLERANCIA_VALOR) return true;
+  if (Boolean(novo.venda_direta) !== Boolean(existente.venda_direta)) return true;
+  // Preenchendo nome do item/link que faltava (reimport de planilha antiga, por exemplo) —
+  // sem isso, pedidos com valores financeiros iguais eram pulados e o nome nunca era salvo.
+  if (novo.nome_item && novo.nome_item !== existente.nome_item) return true;
+  if (novo.item_link && novo.item_link !== existente.item_link) return true;
+  return false; // tudo igual — não precisa regravar
+};
+
 // ── HANDLER ──────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
@@ -105,6 +150,11 @@ exports.handler = async (event) => {
     // ════════════════════════════════════════════
     // SHOPEE PEDIDOS
     // Recebe array de pedidos da API Shopee ou CSV
+    // OTIMIZAÇÃO INCREMENTAL: compara com o que já existe no Supabase antes de
+    // gravar — só faz upsert de pedidos novos ou que mudaram (status, comissão,
+    // venda total ou venda direta). Pedidos idênticos ao que já está salvo são
+    // pulados, reduzindo drasticamente a escrita quando a API devolve os mesmos
+    // 90 dias de histórico a cada sync.
     // ════════════════════════════════════════════
     if (tipo === 'shopee') {
       const pedidos = body.pedidos || [];
@@ -116,7 +166,7 @@ exports.handler = async (event) => {
       const fim    = pedidos.reduce((m,r) => r.data_pedido > m ? r.data_pedido : m, pedidos[0].data_pedido);
 
       // Garante campos obrigatórios e normaliza
-      const rows = pedidos.map(p => ({
+      const todasRows = pedidos.map(p => ({
         order_id:         p.order_id         || '',
         conversion_id:    p.conversion_id    || null,
         conta:            p.conta            || conta,
@@ -131,12 +181,36 @@ exports.handler = async (event) => {
         venda_total:      Number(p.venda_total)      || 0,
         venda_direta:     Boolean(p.venda_direta),
         shop_name:        p.shop_name        || null,
-        item_name:        p.item_name        || null,
+        nome_item:        p.item_name        || p.nome_item        || null,
+        item_link:        p.item_link        || null,
         channel_type:     p.channel_type     || null,
         attribution_type: p.attribution_type || null,
         fonte:            p.fonte            || 'api',
         updated_at:       new Date().toISOString(),
       })).filter(r => r.order_id);
+
+      // Busca o que já existe no Supabase para os order_ids deste lote, e filtra
+      // apenas os pedidos que são novos ou que mudaram de fato.
+      let rows = todasRows;
+      let pulados = 0;
+      try {
+        const orderIds = todasRows.map(r => r.order_id);
+        const existentesMap = await buscarExistentesPorOrderId(orderIds);
+        rows = todasRows.filter(r => pedidoMudou(r, existentesMap[r.order_id]));
+        pulados = todasRows.length - rows.length;
+      } catch(e) {
+        console.warn('Comparação incremental falhou, gravando tudo sem otimizar:', e.message);
+        rows = todasRows; // fallback seguro: nunca perde dados, só perde a otimização nesta chamada
+      }
+
+      if (!rows.length) {
+        await gravarLog(conta, 'shopee', inicio, fim, 'ok', pedidos.length, 0);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ ok: true, salvos: 0, pulados, recebidos: pedidos.length }),
+        };
+      }
 
       const erros = await upsert('shopee_pedidos', 'order_id', rows);
       const salvos = rows.length - (erros.length * 200); // estimativa
@@ -147,7 +221,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: !erros.length, salvos: rows.length, erros }),
+        body: JSON.stringify({ ok: !erros.length, salvos: rows.length, pulados, recebidos: pedidos.length, erros }),
       };
     }
 
@@ -252,6 +326,10 @@ exports.handler = async (event) => {
         operacao:    l.operacao    || null,
         comissao:    Number(l.comissao)    || 0,
         venda_total: Number(l.venda_total) || 0,
+        status:      l.status      || 'COMPLETED',
+        pedidos:     Number(l.pedidos)     || 0,
+        pagamentos:  Number(l.pagamentos)  || 0,
+        cliques:     Number(l.cliques)     || 0,
         updated_at:  new Date().toISOString(),
       })).filter(r => r.id && r.data && r.conta);
 
