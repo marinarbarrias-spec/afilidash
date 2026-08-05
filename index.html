@@ -5093,10 +5093,10 @@ async function buscarPedidosShopee(conta) {
   const STATUS_MAP = { pending:'PENDING', completed:'COMPLETED', cancelled:'CANCELLED', unpaid:'UNPAID' };
   let todos = [];
 
-  // Divide 90 dias em 6 janelas de 15 dias para evitar limite de paginação por query.
-  // O fim da janela é o INSTANTE ATUAL (não a meia-noite), senão o dia de hoje — e às
-  // vezes o final de ontem — ficava de fora, e pedidos recém-criados na Shopee não vinham.
-  const fimTs  = Math.floor(Date.now() / 1000);
+  // Divide 90 dias em 3 janelas de 30 dias para evitar limite de paginação por query
+  const agora = new Date(Date.now() - 3*60*60*1000);
+  const fimBRT = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 3, 0, 0);
+  const fimTs  = Math.floor(fimBRT / 1000);
   const janelas = [];
   for (let j = 0; j < 6; j++) {
     const jFim   = fimTs   - (j * 15 * 86400);
