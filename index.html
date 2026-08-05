@@ -548,40 +548,8 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     PÁGINA: PEDIDOS
-══════════════════════════════════════════ -->
-<div class="page" id="page-diario">
-  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-    <div>
-      <div class="section-title">Resultado Diário</div>
-      <div class="section-sub" id="diario-sub">Comissões validadas vs Gasto Meta</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <input type="date" id="diario-de" style="border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg2);color:var(--text);">
-      <span style="color:var(--muted);font-size:12px;">até</span>
-      <input type="date" id="diario-ate" style="border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg2);color:var(--text);">
-      <button onclick="renderDiario()" style="padding:5px 12px;border:1px solid #2563eb;border-radius:var(--r);background:#2563eb;color:#fff;font-size:12px;cursor:pointer;">Filtrar</button>
-    </div>
-  </div>
-  <div class="tbl-wrap" style="overflow-x:auto;">
-    <table class="tbl" id="diario-tbl" style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead>
-        <tr style="background:var(--bg2);text-align:right;">
-          <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);">Data</th>
-          <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Gasto Meta</th>
-          <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Comissão Marina</th>
-          <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Comissão Lucas (−11%)</th>
-          <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Resultado Líquido</th>
-        </tr>
-      </thead>
-      <tbody id="diario-body">
-        <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>
-      </tbody>
-      <tfoot id="diario-foot"></tfoot>
-    </table>
-  </div>
-</div>
+<div class="page" id="page-diario-removido" style="display:none;"></div>
+
 
 <div class="page" id="page-pedidos">
   <div class="toolbar">
@@ -1338,9 +1306,7 @@ async function sbGet(path) {
 }
 
 // Versão GLOBAL de sbGetAll — busca todas as páginas de um caminho do Supabase
-// (o REST limita 1000 linhas por request). Existiam só versões locais dentro de
-// _carregarPeriodoV3/_carregarPeriodoMgv, que a aba Diário (renderDiario) não
-// enxergava — daí o erro "sbGetAll is not defined". Reaproveita o sbGet global,
+// (o REST limita 1000 linhas por request). Reaproveita o sbGet global,
 // que já inicializa o Supabase por dentro.
 async function sbGetAll(path) {
   let todos = [], offset = 0;
@@ -6621,7 +6587,7 @@ const _navAbasPadrao = () => ([
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:3 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:4 },
   { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:5 },
-  { id:'diario', label:'Diário', icon:'📆', desc:'Resultado diário: comissões validadas vs gasto Meta.', visible:true, ordem:6 },
+  { id:'diario', label:'Diário', icon:'📆', desc:'Resultado diário: comissões validadas vs gasto Meta.', visible:false, ordem:6 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -12670,7 +12636,7 @@ function showPage(id, btn) {
     render(); // garante que a aba principal reflita a conta/filtro atual ao abrir
     return;
   }
-  if (id==='diario') { renderDiario(); return; }
+  if (id==='diario') { return; }
   if (id==='criativo')    renderCriativo();
   if ((id === 'meta-gmv' || id === 'mensal') && _bootDadosPromise && !_bootDadosFinalizado) {
     const pgId = id === 'meta-gmv' ? 'page-meta-gmv' : 'page-mensal';
@@ -13245,103 +13211,6 @@ _carregarConfigServidor().then(carregouServidor => {
   setInterval(() => whatsAtualizarGrupos(true), 5 * 60 * 1000);
 });
 
-// ══ ABA DIÁRIO ══════════════════════════════════════════════════════
-async function renderDiario() {
-  const body = document.getElementById('diario-body');
-  const foot = document.getElementById('diario-foot');
-  if (!body) return;
-  body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>';
-
-  // Datas padrão: últimos 30 dias
-  const hoje = new Date();
-  const dAte = hoje.toISOString().slice(0,10);
-  const d30 = new Date(hoje); d30.setDate(d30.getDate()-29);
-  const dDe = d30.toISOString().slice(0,10);
-  const inDe  = document.getElementById('diario-de');
-  const inAte = document.getElementById('diario-ate');
-  if (inDe && !inDe.value)  inDe.value  = dDe;
-  if (inAte && !inAte.value) inAte.value = dAte;
-  const de  = (inDe  && inDe.value)  ? inDe.value  : dDe;
-  const ate = (inAte && inAte.value) ? inAte.value : dAte;
-
-  try {
-    // Busca pedidos Shopee COMPLETED no período
-    const pedidos = await sbGetAll(
-      `/shopee_pedidos?data_pedido=gte.${de}&data_pedido=lte.${ate}&status=eq.COMPLETED&select=data_pedido,conta,comissao_bruta&order=data_pedido.asc`
-    );
-    // Busca gastos Meta no período
-    const metaRows = await sbGetAll(
-      `/meta_ads?data=gte.${de}&data=lte.${ate}&select=data,gasto&order=data.asc`
-    );
-
-    // Agrupa por data
-    const porData = {};
-    const addData = d => { if (!porData[d]) porData[d] = { marina:0, lucas:0, meta:0 }; };
-
-    pedidos.forEach(r => {
-      const d = (r.data_pedido||'').slice(0,10);
-      if (!d) return;
-      addData(d);
-      const com = Number(r.comissao_bruta)||0;
-      const conta = (r.conta||'').toUpperCase();
-      if (conta.includes('LUCAS')) porData[d].lucas += com;
-      else porData[d].marina += com;
-    });
-
-    metaRows.forEach(r => {
-      const d = (r.data||'').slice(0,10);
-      if (!d) return;
-      addData(d);
-      porData[d].meta += Number(r.gasto)||0;
-    });
-
-    // Ordenar datas
-    const datas = Object.keys(porData).sort();
-    if (!datas.length) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Nenhum dado no período.</td></tr>';
-      return;
-    }
-
-    const fmt = v => 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.') ;
-    const corRes = v => v >= 0 ? 'color:var(--green);font-weight:600' : 'color:var(--red);font-weight:600';
-
-    let totMeta=0, totMarina=0, totLucas=0;
-    let rows = '';
-    datas.forEach(d => {
-      const v = porData[d];
-      const lucasLiq = v.lucas * 0.89; // desconta 11% INSS
-      const resultado = v.marina + lucasLiq - v.meta;
-      totMeta    += v.meta;
-      totMarina  += v.marina;
-      totLucas   += v.lucas;
-      const [ano,mes,dia] = d.split('-');
-      const dataFmt = `${dia}/${mes}/${ano}`;
-      rows += `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:7px 10px;text-align:left;">${dataFmt}</td>
-        <td style="padding:7px 10px;text-align:right;">${v.meta ? fmt(v.meta) : '—'}</td>
-        <td style="padding:7px 10px;text-align:right;">${v.marina ? fmt(v.marina) : '—'}</td>
-        <td style="padding:7px 10px;text-align:right;">${v.lucas ? fmt(v.lucas * 0.89) + ' <span style="font-size:10px;color:var(--muted);">(bruto: '+fmt(v.lucas)+')</span>' : '—'}</td>
-        <td style="padding:7px 10px;text-align:right;${corRes(resultado)}">${fmt(resultado)}</td>
-      </tr>`;
-    });
-    body.innerHTML = rows;
-
-    // Totais
-    const totLucasLiq = totLucas * 0.89;
-    const totRes = totMarina + totLucasLiq - totMeta;
-    foot.innerHTML = `<tr style="background:var(--bg2);font-weight:700;border-top:2px solid var(--border);">
-      <td style="padding:8px 10px;text-align:left;">TOTAL</td>
-      <td style="padding:8px 10px;text-align:right;">${fmt(totMeta)}</td>
-      <td style="padding:8px 10px;text-align:right;">${fmt(totMarina)}</td>
-      <td style="padding:8px 10px;text-align:right;">${fmt(totLucasLiq)} <span style="font-size:10px;color:var(--muted);">(bruto: ${fmt(totLucas)})</span></td>
-      <td style="padding:8px 10px;text-align:right;${corRes(totRes)}">${fmt(totRes)}</td>
-    </tr>`;
-
-    document.getElementById('diario-sub').textContent = `${datas.length} dias · ${de} → ${ate}`;
-  } catch(e) {
-    body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--red);">Erro ao carregar: ${e.message}</td></tr>`;
-  }
-}
 </script>
 </body>
 </html>
