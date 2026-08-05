@@ -548,9 +548,9 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
   </div>
 </div>
 
-<div class="page" id="page-diario-removido" style="display:none;"></div>
-
-
+<!-- ══════════════════════════════════════════
+     PÁGINA: PEDIDOS
+══════════════════════════════════════════ -->
 <div class="page" id="page-pedidos">
   <div class="toolbar">
     <div style="display:flex;align-items:center;gap:10px;">
@@ -1305,23 +1305,6 @@ async function sbGet(path) {
   return res.json();
 }
 
-// Versão GLOBAL de sbGetAll — busca todas as páginas de um caminho do Supabase
-// (o REST limita 1000 linhas por request). Reaproveita o sbGet global,
-// que já inicializa o Supabase por dentro.
-async function sbGetAll(path) {
-  let todos = [], offset = 0;
-  const PAGE = 1000;
-  while (true) {
-    const sep  = path.includes('?') ? '&' : '?';
-    const rows = await sbGet(`${path}${sep}limit=${PAGE}&offset=${offset}`);
-    todos = todos.concat(rows);
-    if (rows.length < PAGE) break;
-    offset += PAGE;
-    if (offset > 500000) break; // trava de segurança
-  }
-  return todos;
-}
-
 async function sbPatch(path, payload) {
   await _inicializarSupabase();
   if (!SB_BASE) throw new Error('Supabase não inicializado');
@@ -1998,7 +1981,7 @@ async function _carregarPeriodoMgv(de, ate) {
       return todos;
     };
 
-    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,item_name,item_link';
+    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link';
     const SEL_META     = 'id,data,conta,campanha,gasto,conta_meta_id,status_camp';
 
     const [pedidos, meta, manuais] = await Promise.all([
@@ -2017,7 +2000,7 @@ async function _carregarPeriodoMgv(de, ate) {
         Venda_Total: Math.round((Number(r.venda_total)||0)*100)/100,
         Venda_Direta: r.venda_direta ? 1 : 0,
         Gasto_Meta: 0,
-        Nome_Item: r.item_name || r.nome_item || null,
+        Nome_Item: r.nome_item || null,
         item_link: r.item_link || null,
       })),
       ...meta.map(r => ({
@@ -3728,7 +3711,7 @@ async function togglePedidosDia(safeId, dt, sid, contaFiltro) {
   let pedidos  = [];
   try {
     const contaQ = contaFiltro ? '&conta=eq.' + encodeURIComponent(contaFiltro) : '';
-    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,item_name,item_link&order=comissao_bruta.desc`);
+    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item,item_link&order=comissao_bruta.desc`);
   } catch(e) { console.warn('togglePedidosDia erro:', e.message); return; }
   if (!pedidos || !pedidos.length) return;
 
@@ -3763,7 +3746,7 @@ async function togglePedidosDia(safeId, dt, sid, contaFiltro) {
       <td></td>
       <td></td>
       <td style="padding:3px 8px;font-family:monospace;font-size:9px;color:var(--muted);white-space:nowrap;vertical-align:middle;text-align:center">${esc(p.order_id)}</td>
-      <td colspan="2" style="padding:3px 8px;text-align:left;color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:1px">${(p.item_name || p.nome_item) ? esc(p.item_name || p.nome_item) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td colspan="2" style="padding:3px 8px;text-align:left;color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:1px">${p.nome_item ? esc(p.nome_item) : '<span style="color:var(--muted)">—</span>'}</td>
       <td style="padding:3px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${p.item_link ? `<a href="${esc(p.item_link)}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none;font-size:9px;padding:1px 5px;border:1px solid #bfdbfe;border-radius:3px;">↗ ver</a>` : ''}</td>
       <td style="padding:3px 8px;text-align:right;color:var(--green);font-weight:600;white-space:nowrap;vertical-align:middle">${_ok ? r2brl(p.comissao_bruta) : '—'}</td>
       <td colspan="2" style="padding:3px 8px;text-align:left;vertical-align:middle;white-space:nowrap;color:#7c3aed;font-weight:600">${_ok ? 'Venda: ' + r2brl(p.venda_total) : '—'}</td>
@@ -5059,10 +5042,10 @@ async function buscarPedidosShopee(conta) {
   const STATUS_MAP = { pending:'PENDING', completed:'COMPLETED', cancelled:'CANCELLED', unpaid:'UNPAID' };
   let todos = [];
 
-  // Divide 90 dias em 6 janelas de 15 dias para evitar limite de paginação por query.
-  // O fim da janela é o INSTANTE ATUAL (não a meia-noite), senão o dia de hoje — e às
-  // vezes o final de ontem — ficava de fora, e pedidos recém-criados na Shopee não vinham.
-  const fimTs  = Math.floor(Date.now() / 1000);
+  // Divide 90 dias em 3 janelas de 30 dias para evitar limite de paginação por query
+  const agora = new Date(Date.now() - 3*60*60*1000);
+  const fimBRT = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 3, 0, 0);
+  const fimTs  = Math.floor(fimBRT / 1000);
   const janelas = [];
   for (let j = 0; j < 6; j++) {
     const jFim   = fimTs   - (j * 15 * 86400);
@@ -6587,7 +6570,6 @@ const _navAbasPadrao = () => ([
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:3 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:4 },
   { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:5 },
-  { id:'diario', label:'Diário', icon:'📆', desc:'Resultado diário: comissões validadas vs gasto Meta.', visible:false, ordem:6 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -12636,7 +12618,6 @@ function showPage(id, btn) {
     render(); // garante que a aba principal reflita a conta/filtro atual ao abrir
     return;
   }
-  if (id==='diario') { return; }
   if (id==='criativo')    renderCriativo();
   if ((id === 'meta-gmv' || id === 'mensal') && _bootDadosPromise && !_bootDadosFinalizado) {
     const pgId = id === 'meta-gmv' ? 'page-meta-gmv' : 'page-mensal';
@@ -13210,7 +13191,6 @@ _carregarConfigServidor().then(carregouServidor => {
   });
   setInterval(() => whatsAtualizarGrupos(true), 5 * 60 * 1000);
 });
-
 </script>
 </body>
 </html>
