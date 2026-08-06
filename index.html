@@ -1443,7 +1443,7 @@ async function _syncDadosParcialServidor(novosRegistros) {
             Cliques_Meta:r.cliques_meta, Cliques_Shopee:r.cliques_shopee,
             Pedidos_Total:r.pedidos_total, Venda_Direta:r.venda_direta,
             _fonte:r.fonte, _contaMeta_id:r.conta_meta_id, _meta_status:r.meta_status,
-            Nome_Item:r.nome_item || null,
+            Nome_Item:(r.item_name || r.nome_item) || null,
           }));
         } catch(e) { console.warn('Falha ao carregar mês do Supabase:', mes, e.message); }
 
@@ -1743,7 +1743,7 @@ async function _carregarMes(mes) {
         _fonte:         r.fonte,
         _contaMeta_id:  r.conta_meta_id,
         _meta_status:   r.meta_status,
-        Nome_Item:      r.nome_item || null,
+        Nome_Item:      (r.item_name || r.nome_item) || null,
       }));
       // Mescla com o que já está em DADOS por _id. Seguro mesmo com vários meses
       // carregando em paralelo: a leitura+escrita de DADOS aqui é toda síncrona
@@ -1981,7 +1981,7 @@ async function _carregarPeriodoMgv(de, ate) {
       return todos;
     };
 
-    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link';
+    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item:item_name';
     const SEL_META     = 'id,data,conta,campanha,gasto,conta_meta_id,status_camp';
 
     const [pedidos, meta, manuais] = await Promise.all([
@@ -2000,7 +2000,7 @@ async function _carregarPeriodoMgv(de, ate) {
         Venda_Total: Math.round((Number(r.venda_total)||0)*100)/100,
         Venda_Direta: r.venda_direta ? 1 : 0,
         Gasto_Meta: 0,
-        Nome_Item: r.nome_item || null,
+        Nome_Item: (r.item_name || r.nome_item) || null,
         item_link: r.item_link || null,
       })),
       ...meta.map(r => ({
@@ -3711,7 +3711,7 @@ async function togglePedidosDia(safeId, dt, sid, contaFiltro) {
   let pedidos  = [];
   try {
     const contaQ = contaFiltro ? '&conta=eq.' + encodeURIComponent(contaFiltro) : '';
-    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item,item_link&order=comissao_bruta.desc`);
+    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item:item_name&order=comissao_bruta.desc`);
   } catch(e) { console.warn('togglePedidosDia erro:', e.message); return; }
   if (!pedidos || !pedidos.length) return;
 
