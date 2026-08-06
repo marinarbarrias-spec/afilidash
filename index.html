@@ -1981,7 +1981,7 @@ async function _carregarPeriodoMgv(de, ate) {
       return todos;
     };
 
-    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link';
+    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item';
     const SEL_META     = 'id,data,conta,campanha,gasto,conta_meta_id,status_camp';
 
     const [pedidos, meta, manuais] = await Promise.all([
@@ -3711,7 +3711,7 @@ async function togglePedidosDia(safeId, dt, sid, contaFiltro) {
   let pedidos  = [];
   try {
     const contaQ = contaFiltro ? '&conta=eq.' + encodeURIComponent(contaFiltro) : '';
-    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item,item_link&order=comissao_bruta.desc`);
+    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item&order=comissao_bruta.desc`);
   } catch(e) { console.warn('togglePedidosDia erro:', e.message); return; }
   if (!pedidos || !pedidos.length) return;
 
