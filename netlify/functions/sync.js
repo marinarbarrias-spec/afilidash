@@ -98,7 +98,7 @@ const buscarExistentesPorOrderId = async (orderIds, LOTE = 200) => {
     const filtro = lote.map(id => `"${String(id).replace(/"/g,'\\"')}"`).join(',');
     try {
       const res = await fetch(
-        `${base()}/shopee_pedidos?order_id=in.(${filtro})&select=order_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link`,
+        `${base()}/shopee_pedidos?order_id=in.(${filtro})&select=order_id,status,comissao_bruta,venda_total,venda_direta,item_name`,
         {
           headers: {
             'apikey':        SUPA_KEY(),
@@ -128,8 +128,7 @@ const pedidoMudou = (novo, existente) => {
   if (Boolean(novo.venda_direta) !== Boolean(existente.venda_direta)) return true;
   // Preenchendo nome do item/link que faltava (reimport de planilha antiga, por exemplo) —
   // sem isso, pedidos com valores financeiros iguais eram pulados e o nome nunca era salvo.
-  if (novo.nome_item && novo.nome_item !== existente.nome_item) return true;
-  if (novo.item_link && novo.item_link !== existente.item_link) return true;
+  if (novo.item_name && novo.item_name !== existente.item_name) return true;
   return false; // tudo igual — não precisa regravar
 };
 
@@ -181,8 +180,7 @@ exports.handler = async (event) => {
         venda_total:      Number(p.venda_total)      || 0,
         venda_direta:     Boolean(p.venda_direta),
         shop_name:        p.shop_name        || null,
-        nome_item:        p.item_name        || p.nome_item        || null,
-        item_link:        p.item_link        || null,
+        item_name:        p.item_name        || p.nome_item        || null,
         channel_type:     p.channel_type     || null,
         attribution_type: p.attribution_type || null,
         fonte:            p.fonte            || 'api',
