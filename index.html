@@ -12103,7 +12103,7 @@ async function _whatsLeadsBuscar() {
     const filtering = encodeURIComponent(JSON.stringify([
       { field: 'campaign.name', operator: 'CONTAIN', value: 'GRUPO ACHADINHOS' }
     ]));
-    const fields = 'campaign_name,spend,impressions,reach,clicks,actions,inline_link_clicks,date_start,effective_status';
+    const fields = 'campaign_name,spend,impressions,reach,clicks,actions,inline_link_clicks,date_start';
     // Nível campanha, breakdown por dia (time_increment=1)
     const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${encodeURIComponent(contaMeta.token)}`;
 
