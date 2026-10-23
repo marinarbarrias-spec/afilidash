@@ -1152,6 +1152,91 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
 </div>
 
 <!-- ══════════════════════════════════════════
+     PÁGINA: COMISSÕES VALIDADAS
+══════════════════════════════════════════ -->
+<div class="page" id="page-comissoes">
+  <div class="toolbar" style="gap:10px;flex-wrap:wrap;">
+    <div style="display:flex;gap:6px;align-items:center;">
+      <label style="font-size:12px;color:var(--muted);">Mês inicial</label>
+      <input type="month" id="com-mes-de" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="renderComissoes()">
+      <label style="font-size:12px;color:var(--muted);">até</label>
+      <input type="month" id="com-mes-ate" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="renderComissoes()">
+    </div>
+    <button class="act-btn" onclick="_comBuscarAtualizar()" style="border-color:#2563eb;color:#2563eb;">⚡ Atualizar</button>
+    <div id="com-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div id="com-kpis" style="display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px 4px;"></div>
+
+  <!-- Tabela por mês -->
+  <div class="section" style="margin:10px 20px;">
+    <div class="section-head">
+      <div>
+        <div class="section-title">✅ Comissões Validadas por mês</div>
+        <div class="section-sub" id="com-table-sub">—</div>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:calc(100vh - 400px);overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="text-align:left;color:var(--muted);background:var(--bg2);position:sticky;top:0;z-index:2;">
+            <th style="padding:8px 12px;">Mês</th>
+            <th style="padding:8px 12px;text-align:right;">Comissão bruta</th>
+            <th style="padding:8px 12px;text-align:right;">Pedidos validados</th>
+            <th style="padding:8px 12px;text-align:right;">INSS (11%)</th>
+            <th style="padding:8px 12px;text-align:right;">Comissão líquida</th>
+            <th style="padding:8px 12px;text-align:right;">Gasto Meta (período)</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:700;">Saldo</th>
+            <th style="padding:8px 12px;text-align:right;">Contas</th>
+          </tr>
+        </thead>
+        <tbody id="com-body">
+          <tr><td colspan="8" class="empty">Clique em "Atualizar" para carregar.</td></tr>
+        </tbody>
+        <tfoot id="com-tfoot" style="display:none;">
+          <tr style="font-weight:700;background:var(--bg2);border-top:2px solid var(--border);">
+            <td style="padding:8px 12px;">Total</td>
+            <td id="com-tot-bruto"  style="padding:8px 12px;text-align:right;"></td>
+            <td id="com-tot-ped"    style="padding:8px 12px;text-align:right;"></td>
+            <td id="com-tot-inss"   style="padding:8px 12px;text-align:right;"></td>
+            <td id="com-tot-liq"    style="padding:8px 12px;text-align:right;color:var(--green);"></td>
+            <td id="com-tot-meta"   style="padding:8px 12px;text-align:right;color:#dc2626;"></td>
+            <td id="com-tot-saldo"  style="padding:8px 12px;text-align:right;font-size:15px;"></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Detalhamento por campanha -->
+  <div class="section" style="margin:10px 20px;" id="com-detail-section" style="display:none;">
+    <div class="section-head">
+      <div>
+        <div class="section-title">📋 Detalhamento por campanha <span id="com-detail-mes" style="font-weight:400;font-size:12px;color:var(--muted);"></span></div>
+        <div class="section-sub">Pedidos com status Concluído (Validado)</div>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:300px;overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="text-align:left;color:var(--muted);background:var(--bg2);position:sticky;top:0;z-index:2;">
+            <th style="padding:6px 10px;">Campanha (Sub_ID)</th>
+            <th style="padding:6px 10px;text-align:right;">Comissão bruta</th>
+            <th style="padding:6px 10px;text-align:right;">Pedidos</th>
+            <th style="padding:6px 10px;text-align:right;">Conta</th>
+          </tr>
+        </thead>
+        <tbody id="com-detail-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="font-size:10px;color:var(--muted);padding:4px 20px 8px;">ℹ️ Comissões Validadas = pedidos com status COMPLETED (já confirmados pela Shopee). Gasto Meta = soma do período correspondente ao mês de conclusão dos pedidos. INSS 11% aplicado apenas na conta SHOPEE LUCAS.</div>
+</div>
+
+<!-- ══════════════════════════════════════════
      PÁGINA: LANÇAMENTOS MANUAIS
 ══════════════════════════════════════════ -->
 <div class="page" id="page-lancamentos">
@@ -6656,6 +6741,7 @@ const _navAbasPadrao = () => ([
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:3 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:4 },
   { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:5 },
+  { id:'comissoes', label:'Comissões', icon:'✅', desc:'Comissões validadas pela Shopee por mês, com gasto Meta do período.', visible:true, ordem:6 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -13140,6 +13226,7 @@ function showPage(id, btn) {
     }
   }
   if (id==='lancamentos') renderLancamentos();
+  if (id==='comissoes') renderComissoes();
 }
 
 function _renderizarPaginaAtivaAposBoot() {
@@ -13569,6 +13656,223 @@ _carregarConfigServidor().then(carregouServidor => {
   });
   setInterval(() => whatsAtualizarGrupos(true), 5 * 60 * 1000);
 });
+
+// ══════════════════════════════════════════════════════
+// PÁGINA: COMISSÕES VALIDADAS
+// Mostra comissões COMPLETED da Shopee por mês de conclusão
+// vs. gasto Meta do mesmo período — completamente separado dos KPIs normais
+// ══════════════════════════════════════════════════════
+
+let _COM_CACHE = null; // { de, ate, meses: [...] }
+
+async function renderComissoes() {
+  if (!document.getElementById('page-comissoes')?.classList.contains('active')) return;
+
+  // Inicializa filtro de mês se vazio
+  const mesDeEl  = document.getElementById('com-mes-de');
+  const mesAteEl = document.getElementById('com-mes-ate');
+  if (!mesDeEl || !mesAteEl) return;
+
+  if (!mesDeEl.value) {
+    const hoje = new Date(Date.now() - 3*60*60*1000);
+    const anoMes = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const ate6 = new Date(hoje); ate6.setMonth(ate6.getMonth());
+    const de6  = new Date(hoje); de6.setMonth(de6.getMonth()-5);
+    mesDeEl.value  = anoMes(de6);
+    mesAteEl.value = anoMes(hoje);
+  }
+
+  const mesDe  = mesDeEl.value;  // "2026-08"
+  const mesAte = mesAteEl.value; // "2026-10"
+  if (!mesDe || !mesAte) return;
+
+  // Intervalo de datas (dia 01 do mês inicial até dia 31 do mês final)
+  const de  = mesDe  + '-01';
+  const ate = mesAte + '-31';
+
+  document.getElementById('com-status').textContent = '⏳ Buscando…';
+
+  try {
+    // 1) Busca pedidos COMPLETED com data_conclusao no período
+    const pedidosRaw = await _comSbGetAll(
+      `/shopee_pedidos?data_conclusao=gte.${de}&data_conclusao=lte.${ate}&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao&order=data_conclusao.asc`
+    );
+
+    // 2) Busca gasto Meta no mesmo período
+    const metaRaw = await _comSbGetAll(
+      `/meta_ads?data=gte.${de}&data=lte.${ate}&select=data,campanha,gasto,conta_meta_id`
+    );
+
+    // Agrupa pedidos por mês de data_conclusao
+    const mesesMap = {};
+    pedidosRaw.forEach(r => {
+      const mes = String(r.data_conclusao || '').slice(0,7); // "2026-09"
+      if (!mes) return;
+      if (!mesesMap[mes]) mesesMap[mes] = { mes, bruto:0, pedidos:0, inss:0, liq:0, gasto:0, saldo:0, contas:new Set(), campanhas:{} };
+      const m   = mesesMap[mes];
+      const com = Number(r.comissao_bruta) || 0;
+      const conta = r.conta || '';
+      // INSS 11% só para SHOPEE LUCAS
+      const inss = conta.toUpperCase().includes('LUCAS') ? com * 0.11 : 0;
+      m.bruto   += com;
+      m.pedidos += 1;
+      m.inss    += inss;
+      m.liq     += (com - inss);
+      m.contas.add(conta);
+      // detalhe por campanha
+      const sid = r.sub_id || '(sem campanha)';
+      if (!m.campanhas[sid]) m.campanhas[sid] = { bruto:0, pedidos:0, conta };
+      m.campanhas[sid].bruto   += com;
+      m.campanhas[sid].pedidos += 1;
+    });
+
+    // Agrupa gasto Meta por mês
+    metaRaw.forEach(r => {
+      const mes = String(r.data || '').slice(0,7);
+      if (!mesesMap[mes]) return; // só meses que têm comissão validada
+      const gasto = Number(r.gasto) || 0;
+      // Aplica alíquota ISS/taxa da conta Meta
+      let aliq = 0;
+      const cmId = r.conta_meta_id;
+      const cm = (CFG_META||[]).find(m => cmId && m.id === cmId);
+      if (cm) aliq = getAliquotaMeta(cm.id, r.data);
+      else for (const m of (CFG_META||[])) { const a = getAliquotaMeta(m.id, r.data); if (a > 0) { aliq = a; break; } }
+      mesesMap[mes].gasto += gasto * (1 + aliq);
+    });
+
+    // Finaliza saldo e ordena
+    const meses = Object.values(mesesMap)
+      .map(m => ({ ...m, saldo: m.liq - m.gasto, contas: [...m.contas].join(', ') }))
+      .sort((a,b) => a.mes.localeCompare(b.mes));
+
+    _COM_CACHE = { de, ate, meses };
+    _comRenderizar(meses);
+    document.getElementById('com-status').textContent = `✅ ${meses.length} mês(es) · ${mesDe} a ${mesAte}`;
+  } catch(e) {
+    document.getElementById('com-status').textContent = '❌ ' + (e.message || 'Erro');
+    document.getElementById('com-body').innerHTML = `<tr><td colspan="8" class="empty" style="color:var(--red);">Erro: ${esc(e.message||String(e))}</td></tr>`;
+  }
+}
+
+async function _comBuscarAtualizar() {
+  _COM_CACHE = null;
+  await renderComissoes();
+}
+
+async function _comSbGetAll(path) {
+  let todos = [], offset = 0;
+  const PAGE = 1000;
+  while (true) {
+    const sep = path.includes('?') ? '&' : '?';
+    const res = await fetch(SB_BASE + path + sep + `limit=${PAGE}&offset=${offset}`, {
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.message || 'Supabase HTTP ' + res.status); }
+    const rows = await res.json();
+    todos = todos.concat(rows);
+    if (rows.length < PAGE) break;
+    offset += PAGE;
+    if (offset > 200000) break;
+  }
+  return todos;
+}
+
+function _comRenderizar(meses) {
+  const body  = document.getElementById('com-body');
+  const tfoot = document.getElementById('com-tfoot');
+  const kpisEl = document.getElementById('com-kpis');
+  if (!body) return;
+
+  const brl = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const num = v => Number(v||0).toLocaleString('pt-BR');
+  const fmtMes = m => { const [ano,mes] = m.split('-'); const nomes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return (nomes[parseInt(mes)-1]||mes) + '/' + ano; };
+  const corSaldo = v => v >= 0 ? 'var(--green)' : '#dc2626';
+
+  if (!meses.length) {
+    body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum pedido validado (COMPLETED) encontrado no período.</td></tr>';
+    if (tfoot) tfoot.style.display = 'none';
+    if (kpisEl) kpisEl.innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = meses.map(m => `
+    <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="_comMostrarDetalhe('${esc(m.mes)}')">
+      <td style="padding:8px 12px;font-weight:600;">${esc(fmtMes(m.mes))}</td>
+      <td style="padding:8px 12px;text-align:right;">${esc(brl(m.bruto))}</td>
+      <td style="padding:8px 12px;text-align:right;">${esc(num(m.pedidos))}</td>
+      <td style="padding:8px 12px;text-align:right;color:#f59e0b;">${m.inss > 0 ? '−' + esc(brl(m.inss)) : '—'}</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--green);font-weight:600;">${esc(brl(m.liq))}</td>
+      <td style="padding:8px 12px;text-align:right;color:#dc2626;">${m.gasto > 0 ? '−' + esc(brl(m.gasto)) : '—'}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:14px;color:${corSaldo(m.saldo)};">${esc(brl(m.saldo))}</td>
+      <td style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">${esc(m.contas)}</td>
+    </tr>
+  `).join('');
+
+  // Totais
+  const totBruto  = meses.reduce((s,m) => s + m.bruto,   0);
+  const totPed    = meses.reduce((s,m) => s + m.pedidos,  0);
+  const totInss   = meses.reduce((s,m) => s + m.inss,     0);
+  const totLiq    = meses.reduce((s,m) => s + m.liq,      0);
+  const totMeta   = meses.reduce((s,m) => s + m.gasto,    0);
+  const totSaldo  = totLiq - totMeta;
+
+  if (tfoot) {
+    tfoot.style.display = '';
+    document.getElementById('com-tot-bruto').textContent  = brl(totBruto);
+    document.getElementById('com-tot-ped').textContent    = num(totPed);
+    document.getElementById('com-tot-inss').textContent   = totInss > 0 ? '−' + brl(totInss) : '—';
+    document.getElementById('com-tot-liq').textContent    = brl(totLiq);
+    document.getElementById('com-tot-meta').textContent   = totMeta > 0 ? '−' + brl(totMeta) : '—';
+    const salEl = document.getElementById('com-tot-saldo');
+    salEl.textContent = brl(totSaldo);
+    salEl.style.color = corSaldo(totSaldo);
+  }
+
+  document.getElementById('com-table-sub').textContent = `${totPed} pedidos validados · clique em um mês para ver o detalhamento`;
+
+  // KPIs
+  if (kpisEl) {
+    const kpi = (label, val, cor) => `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 16px;min-width:120px;"><div style="font-size:10px;color:var(--muted);">${label}</div><div style="font-size:17px;font-weight:700;color:${cor||'var(--fg)'};">${val}</div></div>`;
+    kpisEl.innerHTML =
+      kpi('Comissão bruta', brl(totBruto)) +
+      kpi('INSS descontado', totInss > 0 ? brl(totInss) : '—', '#f59e0b') +
+      kpi('Comissão líquida', brl(totLiq), 'var(--green)') +
+      kpi('Gasto Meta', totMeta > 0 ? brl(totMeta) : '—', '#dc2626') +
+      kpi('Saldo final', brl(totSaldo), corSaldo(totSaldo)) +
+      kpi('Pedidos', num(totPed));
+  }
+}
+
+function _comMostrarDetalhe(mes) {
+  if (!_COM_CACHE) return;
+  const m = _COM_CACHE.meses.find(x => x.mes === mes);
+  if (!m) return;
+
+  const brl = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const nomes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [ano, mesN] = mes.split('-');
+  const fmtMes = (nomes[parseInt(mesN)-1]||mesN) + '/' + ano;
+
+  const sec  = document.getElementById('com-detail-section');
+  const body = document.getElementById('com-detail-body');
+  const mesLbl = document.getElementById('com-detail-mes');
+  if (!sec || !body) return;
+
+  sec.style.display = '';
+  if (mesLbl) mesLbl.textContent = '— ' + fmtMes;
+
+  const camps = Object.entries(m.campanhas).sort(([,a],[,b]) => b.bruto - a.bruto);
+  body.innerHTML = camps.map(([sid, c]) => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:6px 10px;font-size:12px;">${esc(sid)}</td>
+      <td style="padding:6px 10px;text-align:right;color:var(--green);">${esc(brl(c.bruto))}</td>
+      <td style="padding:6px 10px;text-align:right;">${c.pedidos}</td>
+      <td style="padding:6px 10px;text-align:right;font-size:11px;color:var(--muted);">${esc(c.conta)}</td>
+    </tr>
+  `).join('');
+
+  sec.scrollIntoView({ behavior:'smooth', block:'start' });
+}
 </script>
 </body>
 </html>
