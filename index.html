@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- AFILIDASH BUILD MARKER: v2026-06-29-150 — se você está vendo isso no "view source" do site
      publicado, o deploy pegou o arquivo certo. Se o site publicado mostrar um número diferente
      (ou nenhum), o upload não substituiu o index.html antigo. -->
@@ -687,6 +687,7 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
       <div style="display:flex;gap:6px;align-items:center;">
         <button class="act-btn" id="whats-tab-btn-grupo" onclick="whatsTrocarSubaba('grupo')" style="border-color:#2563eb;color:#2563eb;">Resumo por grupo</button>
         <button class="act-btn" id="whats-tab-btn-campanha" onclick="whatsTrocarSubaba('campanha')">🔗 Resumo por campanha</button>
+        <button class="act-btn" id="whats-tab-btn-leads" onclick="whatsTrocarSubaba('leads')">📊 Leads Meta</button>
         <input type="text" id="whats-vinc-busca" placeholder="🔎 Buscar campanha..." oninput="_whatsRenderVinculos()" style="display:none;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;min-width:200px;">
       </div>
       <button onclick="_abrirAjuda('whats')" title="Ajuda" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:.6;margin-left:auto;">ℹ️</button>
@@ -731,6 +732,91 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
         <div class="section-head"><div><div class="section-title">🚪 Evasão por dia</div><div class="section-sub" id="whats-chart-ev-sub">—</div></div></div>
         <div id="whats-chart-evasao" style="padding:12px 20px;"></div>
       </div>
+    </div>
+    <!-- SUBABA LEADS META -->
+    <div id="whats-subaba-leads" style="display:none;">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0 6px;flex-wrap:wrap;">
+        <div id="whats-leads-filtro-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <label style="font-size:12px;color:var(--muted);">De</label>
+          <input type="date" id="whats-leads-de" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="_whatsLeadsAplicarFiltro()">
+          <label style="font-size:12px;color:var(--muted);">Até</label>
+          <input type="date" id="whats-leads-ate" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="_whatsLeadsAplicarFiltro()">
+          <button class="act-btn" onclick="_whatsLeadsBuscar()" id="whats-leads-btn-buscar" style="border-color:#2563eb;color:#2563eb;">⚡ Buscar na API</button>
+        </div>
+        <div id="whats-leads-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></div>
+      </div>
+      <!-- KPIs resumo -->
+      <div id="whats-leads-kpis" style="display:flex;gap:10px;flex-wrap:wrap;padding:4px 0 10px;"></div>
+      <!-- Tabela principal -->
+      <div class="tbl-wrap" style="max-height:calc(100vh - 480px);overflow:auto;">
+        <table style="width:max-content;min-width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+          <colgroup>
+            <col style="width:260px;"><!-- Campanha -->
+            <col style="width:70px;"><!-- Status -->
+            <col style="width:100px;"><!-- Gasto -->
+            <col style="width:70px;"><!-- Leads -->
+            <col style="width:100px;"><!-- Custo/lead -->
+            <col style="width:90px;"><!-- Impressões -->
+            <col style="width:90px;"><!-- Alcance -->
+            <col style="width:80px;"><!-- CPM -->
+            <col style="width:80px;"><!-- CTR -->
+            <col style="width:80px;"><!-- CPC -->
+            <col style="width:80px;"><!-- Cl. link -->
+            <col style="width:90px;"><!-- Cl→lead -->
+          </colgroup>
+          <thead>
+            <tr style="text-align:left;color:var(--muted);background:var(--bg2);position:sticky;top:0;z-index:2;">
+              <th style="padding:6px 8px;">Campanha</th>
+              <th style="padding:6px 8px;">Status</th>
+              <th style="padding:6px 8px;">Gasto</th>
+              <th style="padding:6px 8px;">Leads</th>
+              <th style="padding:6px 8px;">Custo/lead</th>
+              <th style="padding:6px 8px;">Impressões</th>
+              <th style="padding:6px 8px;">Alcance</th>
+              <th style="padding:6px 8px;">CPM</th>
+              <th style="padding:6px 8px;">CTR link</th>
+              <th style="padding:6px 8px;">CPC link</th>
+              <th style="padding:6px 8px;">Cl. link</th>
+              <th style="padding:6px 8px;">Cl→lead</th>
+            </tr>
+          </thead>
+          <tbody id="whats-leads-body"><tr><td colspan="12" class="empty">Clique em "Buscar na API" para carregar dados de Leads do Meta.</td></tr></tbody>
+        </table>
+      </div>
+      <!-- Totais -->
+      <div id="whats-leads-totais" style="display:none;border-top:2px solid var(--border);padding:8px 8px;font-size:12px;font-weight:700;background:var(--bg2);"></div>
+      <!-- Tabela por dia -->
+      <div id="whats-leads-diario-wrap" style="display:none;margin-top:14px;">
+        <div class="section-head"><div><div class="section-title">📅 Detalhamento por dia</div></div></div>
+        <div class="tbl-wrap" style="max-height:300px;overflow:auto;">
+          <table style="width:max-content;min-width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+            <colgroup>
+              <col style="width:100px;"><!-- Data -->
+              <col style="width:260px;"><!-- Campanha -->
+              <col style="width:100px;"><!-- Gasto -->
+              <col style="width:70px;"><!-- Leads -->
+              <col style="width:100px;"><!-- Custo/lead -->
+              <col style="width:90px;"><!-- Impressões -->
+              <col style="width:80px;"><!-- CTR -->
+              <col style="width:80px;"><!-- CPC -->
+            </colgroup>
+            <thead>
+              <tr style="text-align:left;color:var(--muted);background:var(--bg2);position:sticky;top:0;z-index:2;">
+                <th style="padding:4px 8px;">Data</th>
+                <th style="padding:4px 8px;">Campanha</th>
+                <th style="padding:4px 8px;">Gasto</th>
+                <th style="padding:4px 8px;">Leads</th>
+                <th style="padding:4px 8px;">Custo/lead</th>
+                <th style="padding:4px 8px;">Impressões</th>
+                <th style="padding:4px 8px;">CTR link</th>
+                <th style="padding:4px 8px;">CPC link</th>
+              </tr>
+            </thead>
+            <tbody id="whats-leads-diario-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);padding:6px 0 2px;">⚠️ Dados buscados direto da API do Meta. Leads = conversões do pixel (offsite_conversion.fb_pixel_lead). Alcance não é somável entre campanhas.</div>
     </div>
   </div>
   <div class="section">
@@ -1443,7 +1529,7 @@ async function _syncDadosParcialServidor(novosRegistros) {
             Cliques_Meta:r.cliques_meta, Cliques_Shopee:r.cliques_shopee,
             Pedidos_Total:r.pedidos_total, Venda_Direta:r.venda_direta,
             _fonte:r.fonte, _contaMeta_id:r.conta_meta_id, _meta_status:r.meta_status,
-            Nome_Item:(r.item_name || r.nome_item) || null,
+            Nome_Item:r.nome_item || null,
           }));
         } catch(e) { console.warn('Falha ao carregar mês do Supabase:', mes, e.message); }
 
@@ -1743,7 +1829,7 @@ async function _carregarMes(mes) {
         _fonte:         r.fonte,
         _contaMeta_id:  r.conta_meta_id,
         _meta_status:   r.meta_status,
-        Nome_Item:      (r.item_name || r.nome_item) || null,
+        Nome_Item:      r.nome_item || null,
       }));
       // Mescla com o que já está em DADOS por _id. Seguro mesmo com vários meses
       // carregando em paralelo: a leitura+escrita de DADOS aqui é toda síncrona
@@ -1981,7 +2067,7 @@ async function _carregarPeriodoMgv(de, ate) {
       return todos;
     };
 
-    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item:item_name';
+    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link';
     const SEL_META     = 'id,data,conta,campanha,gasto,conta_meta_id,status_camp';
 
     const [pedidos, meta, manuais] = await Promise.all([
@@ -2000,7 +2086,7 @@ async function _carregarPeriodoMgv(de, ate) {
         Venda_Total: Math.round((Number(r.venda_total)||0)*100)/100,
         Venda_Direta: r.venda_direta ? 1 : 0,
         Gasto_Meta: 0,
-        Nome_Item: (r.item_name || r.nome_item) || null,
+        Nome_Item: r.nome_item || null,
         item_link: r.item_link || null,
       })),
       ...meta.map(r => ({
@@ -3711,7 +3797,7 @@ async function togglePedidosDia(safeId, dt, sid, contaFiltro) {
   let pedidos  = [];
   try {
     const contaQ = contaFiltro ? '&conta=eq.' + encodeURIComponent(contaFiltro) : '';
-    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item:item_name&order=comissao_bruta.desc`);
+    pedidos = await sbGet(`/shopee_pedidos?sub_id=eq.${sidEnc}&data_pedido=eq.${dtEnc}${contaQ}&select=order_id,status,comissao_bruta,venda_total,nome_item,item_link&order=comissao_bruta.desc`);
   } catch(e) { console.warn('togglePedidosDia erro:', e.message); return; }
   if (!pedidos || !pedidos.length) return;
 
@@ -11926,23 +12012,315 @@ let WHATS_SUBABA = 'grupo';
 function whatsTrocarSubaba(qual) {
   WHATS_SUBABA = qual;
   const pgGrupo = document.getElementById('whats-subaba-grupo');
-  const pgCamp = document.getElementById('whats-subaba-campanha');
-  const busca = document.getElementById('whats-vinc-busca');
-  if (pgGrupo) pgGrupo.style.display = qual === 'grupo' ? '' : 'none';
-  if (pgCamp) pgCamp.style.display = qual === 'campanha' ? '' : 'none';
+  const pgCamp  = document.getElementById('whats-subaba-campanha');
+  const pgLeads = document.getElementById('whats-subaba-leads');
+  const busca   = document.getElementById('whats-vinc-busca');
+  if (pgGrupo) pgGrupo.style.display = qual === 'grupo'    ? '' : 'none';
+  if (pgCamp)  pgCamp.style.display  = qual === 'campanha' ? '' : 'none';
+  if (pgLeads) pgLeads.style.display = qual === 'leads'    ? '' : 'none';
   if (busca) busca.style.display = qual === 'campanha' ? '' : 'none';
   const bG = document.getElementById('whats-tab-btn-grupo');
   const bC = document.getElementById('whats-tab-btn-campanha');
-  if (bG) { bG.style.borderColor = qual === 'grupo' ? '#2563eb' : 'var(--border)'; bG.style.color = qual === 'grupo' ? '#2563eb' : 'var(--muted)'; }
-  if (bC) { bC.style.borderColor = qual === 'campanha' ? '#2563eb' : 'var(--border)'; bC.style.color = qual === 'campanha' ? '#2563eb' : 'var(--muted)'; }
+  const bL = document.getElementById('whats-tab-btn-leads');
+  const cor = id => id === qual ? '#2563eb' : 'var(--border)';
+  const txt = id => id === qual ? '#2563eb' : 'var(--muted)';
+  if (bG) { bG.style.borderColor = cor('grupo');    bG.style.color = txt('grupo'); }
+  if (bC) { bC.style.borderColor = cor('campanha'); bC.style.color = txt('campanha'); }
+  if (bL) { bL.style.borderColor = cor('leads');    bL.style.color = txt('leads'); }
   // "Configurações Grupos" e "Eventos recentes" só fazem sentido olhando por grupo —
-  // na aba de campanha ficam escondidos, sobra espaço pro gráfico de gasto x leads.
-  const secConfig = document.getElementById('whats-grupos-list')?.closest('.section');
+  // nas outras subabas ficam escondidos.
+  const secConfig  = document.getElementById('whats-grupos-list')?.closest('.section');
   const secEventos = document.getElementById('whats-eventos-body')?.closest('.section');
-  if (secConfig) secConfig.style.display = qual === 'grupo' ? '' : 'none';
+  if (secConfig)  secConfig.style.display  = qual === 'grupo' ? '' : 'none';
   if (secEventos) secEventos.style.display = qual === 'grupo' ? '' : 'none';
   if (qual === 'campanha') _whatsRenderVinculos();
+  if (qual === 'leads') _whatsLeadsIniciarFiltro();
 }
+// ══════════════════════════════════════════════════
+// SUBABA LEADS META — busca insights de Leads direto na API do Meta
+// ══════════════════════════════════════════════════
+let _WHATS_LEADS_CACHE = null; // { de, ate, rows: [{campanha,status,gasto,leads,impressoes,alcance,cpm,ctr,cpc,cliques,taxa,porDia:[]}] }
+
+function _whatsLeadsIniciarFiltro() {
+  // Preenche datas com os últimos 7 dias por padrão (ou mantém o que já estava)
+  const deEl  = document.getElementById('whats-leads-de');
+  const ateEl = document.getElementById('whats-leads-ate');
+  if (!deEl || !ateEl) return;
+  if (!deEl.value) {
+    const hoje = new Date(Date.now() - 3*60*60*1000); // BRT
+    const fmt  = d => d.toISOString().slice(0,10);
+    const ate7 = fmt(hoje);
+    const de7  = new Date(hoje); de7.setDate(de7.getDate()-6);
+    deEl.value  = fmt(de7);
+    ateEl.value = ate7;
+  }
+  // Se tiver cache para o mesmo período, só re-renderiza
+  if (_WHATS_LEADS_CACHE && _WHATS_LEADS_CACHE.de === deEl.value && _WHATS_LEADS_CACHE.ate === ateEl.value) {
+    _whatsLeadsRenderizar(_WHATS_LEADS_CACHE.rows, _WHATS_LEADS_CACHE.porDia);
+  }
+}
+
+function _whatsLeadsAplicarFiltro() {
+  // Ao mudar data, limpa cache e mostra botão para rebuscar
+  _WHATS_LEADS_CACHE = null;
+  const body = document.getElementById('whats-leads-body');
+  if (body) body.innerHTML = '<tr><td colspan="12" class="empty">Clique em "Buscar na API" para carregar dados do período selecionado.</td></tr>';
+  const tot = document.getElementById('whats-leads-totais');
+  if (tot) tot.style.display = 'none';
+  const diario = document.getElementById('whats-leads-diario-wrap');
+  if (diario) diario.style.display = 'none';
+  const kpis = document.getElementById('whats-leads-kpis');
+  if (kpis) kpis.innerHTML = '';
+}
+
+async function _whatsLeadsBuscar() {
+  const deEl  = document.getElementById('whats-leads-de');
+  const ateEl = document.getElementById('whats-leads-ate');
+  const statusEl = document.getElementById('whats-leads-status');
+  const btnEl = document.getElementById('whats-leads-btn-buscar');
+  if (!deEl || !ateEl) return;
+  const de  = deEl.value;
+  const ate = ateEl.value;
+  if (!de || !ate) { alert('Selecione o período.'); return; }
+
+  // Pega token e conta Meta
+  const contaMeta = (CFG_META || []).find(m => m.token && m.accountId);
+  if (!contaMeta || !contaMeta.token) {
+    statusEl.textContent = '❌ Configure o token do Meta em Configurações → Meta Ads';
+    return;
+  }
+
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Buscando...'; }
+  if (statusEl) statusEl.textContent = 'Consultando API do Meta…';
+
+  const body = document.getElementById('whats-leads-body');
+  if (body) body.innerHTML = '<tr><td colspan="12" class="empty">Carregando…</td></tr>';
+
+  try {
+    const actId = contaMeta.accountId.startsWith('act_') ? contaMeta.accountId : 'act_' + contaMeta.accountId;
+    const timeRange = encodeURIComponent(JSON.stringify({ since: de, until: ate }));
+    // Filtra apenas campanhas com "GRUPO ACHADINHOS" no nome
+    const filtering = encodeURIComponent(JSON.stringify([
+      { field: 'campaign.name', operator: 'CONTAIN', value: 'GRUPO ACHADINHOS' }
+    ]));
+    const fields = 'campaign_name,spend,impressions,reach,clicks,actions,inline_link_clicks,date_start,effective_status';
+    // Nível campanha, breakdown por dia (time_increment=1)
+    const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${encodeURIComponent(contaMeta.token)}`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || 'Meta API HTTP ' + res.status);
+    }
+    const json = await res.json();
+    let rawRows = json.data || [];
+
+    // Paginação
+    let next = json.paging?.next;
+    let guard = 0;
+    while (next && guard < 10) {
+      const rp = await fetch(next); const jp = await rp.json();
+      rawRows = rawRows.concat(jp.data || []);
+      next = jp.paging?.next; guard++;
+    }
+
+    // Buscar status atual das campanhas (separate call)
+    const statusMap = {};
+    try {
+      const sUrl = `https://graph.facebook.com/v19.0/${actId}/campaigns?fields=name,effective_status&filtering=${encodeURIComponent(JSON.stringify([{field:'name',operator:'CONTAIN',value:'GRUPO ACHADINHOS'}]))}&limit=200&access_token=${encodeURIComponent(contaMeta.token)}`;
+      const sRes = await fetch(sUrl);
+      if (sRes.ok) {
+        const sJson = await sRes.json();
+        (sJson.data || []).forEach(c => { statusMap[c.name] = c.effective_status || ''; });
+      }
+    } catch(e) { /* ignora erro de status */ }
+
+    // Agrupar por campanha e por dia
+    const porCamp = {};  // { nome: { gasto, leads, impressoes, alcanceMax, cliques, clinkques, porDia: {} } }
+    rawRows.forEach(r => {
+      const nome = r.campaign_name || '(sem nome)';
+      if (!porCamp[nome]) porCamp[nome] = { gasto:0, leads:0, impressoes:0, alcance:0, cliques:0, clink:0, porDia:{} };
+      const c = porCamp[nome];
+      const gasto     = parseFloat(r.spend || 0);
+      const impressoes= parseInt(r.impressions || 0);
+      const alcance   = parseInt(r.reach || 0);
+      const cliques   = parseInt(r.clicks || 0);
+      const clink     = parseInt(r.inline_link_clicks || 0);
+      const leads     = (r.actions || []).filter(a => a.action_type === 'offsite_conversion.fb_pixel_lead').reduce((s,a) => s + parseInt(a.value||0), 0);
+      const dia       = r.date_start || '';
+      c.gasto      += gasto;
+      c.leads      += leads;
+      c.impressoes += impressoes;
+      c.alcance    += alcance; // soma dos dias (não é correto mas é o que temos por dia)
+      c.cliques    += cliques;
+      c.clink      += clink;
+      if (dia) {
+        if (!c.porDia[dia]) c.porDia[dia] = { gasto:0, leads:0, impressoes:0, cliques:0, clink:0 };
+        c.porDia[dia].gasto      += gasto;
+        c.porDia[dia].leads      += leads;
+        c.porDia[dia].impressoes += impressoes;
+        c.porDia[dia].cliques    += cliques;
+        c.porDia[dia].clink      += clink;
+      }
+    });
+
+    // Montar rows finais
+    const rows = Object.entries(porCamp).map(([nome, d]) => {
+      const cpm       = d.impressoes > 0 ? (d.gasto / d.impressoes * 1000) : 0;
+      const ctr       = d.cliques    > 0 ? (d.clink  / d.impressoes * 100) : 0;
+      const cpc       = d.clink      > 0 ? (d.gasto  / d.clink)            : 0;
+      const custolead = d.leads      > 0 ? (d.gasto  / d.leads)            : 0;
+      const taxa      = d.clink      > 0 ? (d.leads  / d.clink * 100)      : 0;
+      const status    = statusMap[nome] || '';
+      const porDia    = Object.entries(d.porDia).sort(([a],[b]) => a.localeCompare(b)).map(([dia, v]) => ({
+        dia,
+        gasto:      v.gasto,
+        leads:      v.leads,
+        impressoes: v.impressoes,
+        cliques:    v.cliques,
+        clink:      v.clink,
+        custolead:  v.leads > 0 ? v.gasto / v.leads : 0,
+        ctr:        v.cliques > 0 ? (v.clink / v.impressoes * 100) : 0,
+        cpc:        v.clink   > 0 ? v.gasto / v.clink : 0,
+      }));
+      return { campanha: nome, status, gasto: d.gasto, leads: d.leads, custolead, impressoes: d.impressoes, alcance: d.alcance, cpm, ctr, cpc, cliques: d.clink, taxa, porDia };
+    }).sort((a, b) => b.gasto - a.gasto);
+
+    // Montar detalhe por dia (todas as campanhas juntas)
+    const porDiaTodos = {};
+    rows.forEach(r => {
+      r.porDia.forEach(d => {
+        const key = d.dia + '||' + r.campanha;
+        porDiaTodos[key] = { ...d, campanha: r.campanha };
+      });
+    });
+    const porDiaList = Object.values(porDiaTodos).sort((a,b) => a.dia.localeCompare(b.dia) || a.campanha.localeCompare(b.campanha));
+
+    _WHATS_LEADS_CACHE = { de, ate, rows, porDia: porDiaList };
+    _whatsLeadsRenderizar(rows, porDiaList);
+    if (statusEl) statusEl.textContent = `✅ ${rows.length} campanha(s) · ${de} a ${ate}`;
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '❌ ' + (e.message || 'Erro ao buscar dados');
+    if (body) body.innerHTML = `<tr><td colspan="12" class="empty" style="color:var(--red);">Erro: ${esc(e.message || String(e))}</td></tr>`;
+  } finally {
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '⚡ Buscar na API'; }
+  }
+}
+
+function _whatsLeadsRenderizar(rows, porDiaList) {
+  const body   = document.getElementById('whats-leads-body');
+  const totEl  = document.getElementById('whats-leads-totais');
+  const kpisEl = document.getElementById('whats-leads-kpis');
+  const diarioWrap = document.getElementById('whats-leads-diario-wrap');
+  const diarioBody = document.getElementById('whats-leads-diario-body');
+  if (!body) return;
+
+  const brl  = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct  = v => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  const num  = v => Number(v||0).toLocaleString('pt-BR');
+  const corStatus = s => {
+    const sl = (s||'').toLowerCase();
+    if (sl === 'active')  return '#16a34a';
+    if (sl === 'paused')  return '#f59e0b';
+    return 'var(--muted)';
+  };
+  const labelStatus = s => {
+    const sl = (s||'').toLowerCase();
+    if (sl === 'active')  return 'Ativa';
+    if (sl === 'paused')  return 'Pausada';
+    return s || '—';
+  };
+  const corCL = v => {
+    const cfg = {
+      verde_escuro: parseFloat(localStorage.getItem('ad_cfg_custolead_verdeescuro') || document.getElementById('custolead-verdeescuro')?.value || '0.80'),
+      verde_claro:  parseFloat(localStorage.getItem('ad_cfg_custolead_verdeclaro')  || document.getElementById('custolead-verdeclaro')?.value  || '1.00'),
+      amarelo:      parseFloat(localStorage.getItem('ad_cfg_custolead_amarelo')      || document.getElementById('custolead-amarelo')?.value      || '1.20'),
+    };
+    if (!v || v <= 0) return 'var(--muted)';
+    if (v <= cfg.verde_escuro) return '#166534';
+    if (v <= cfg.verde_claro)  return '#16a34a';
+    if (v <= cfg.amarelo)      return '#f59e0b';
+    return '#dc2626';
+  };
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="12" class="empty">Nenhuma campanha "GRUPO ACHADINHOS" encontrada no período.</td></tr>';
+    if (totEl)  totEl.style.display  = 'none';
+    if (kpisEl) kpisEl.innerHTML     = '';
+    if (diarioWrap) diarioWrap.style.display = 'none';
+    return;
+  }
+
+  // Linhas
+  body.innerHTML = rows.map(r => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 8px;font-weight:600;">${esc(r.campanha)}</td>
+      <td style="padding:7px 8px;"><span style="color:${corStatus(r.status)};font-weight:600;">${esc(labelStatus(r.status))}</span></td>
+      <td style="padding:7px 8px;">${esc(brl(r.gasto))}</td>
+      <td style="padding:7px 8px;font-weight:700;color:var(--blue);">${esc(num(r.leads))}</td>
+      <td style="padding:7px 8px;font-weight:700;color:${corCL(r.custolead)};">${r.leads > 0 ? esc(brl(r.custolead)) : '—'}</td>
+      <td style="padding:7px 8px;">${esc(num(r.impressoes))}</td>
+      <td style="padding:7px 8px;color:var(--muted);">${esc(num(r.alcance))}<span style="font-size:10px;"> *</span></td>
+      <td style="padding:7px 8px;">${esc(brl(r.cpm))}</td>
+      <td style="padding:7px 8px;">${esc(pct(r.ctr))}</td>
+      <td style="padding:7px 8px;">${esc(brl(r.cpc))}</td>
+      <td style="padding:7px 8px;">${esc(num(r.cliques))}</td>
+      <td style="padding:7px 8px;font-weight:600;color:${r.taxa >= 30 ? '#16a34a' : r.taxa >= 20 ? '#f59e0b' : 'var(--muted)'};">${r.clink > 0 || r.cliques > 0 ? esc(pct(r.taxa)) : '—'}</td>
+    </tr>
+  `).join('');
+
+  // Totais
+  const totGasto      = rows.reduce((s,r) => s + r.gasto,      0);
+  const totLeads      = rows.reduce((s,r) => s + r.leads,      0);
+  const totImpress    = rows.reduce((s,r) => s + r.impressoes,  0);
+  const totCliques    = rows.reduce((s,r) => s + r.cliques,     0);
+  const totCustolead  = totLeads   > 0 ? totGasto / totLeads   : 0;
+  const totCpm        = totImpress > 0 ? totGasto / totImpress * 1000 : 0;
+  const totCpc        = totCliques > 0 ? totGasto / totCliques : 0;
+  const totTaxa       = totCliques > 0 ? totLeads / totCliques * 100 : 0;
+  if (totEl) {
+    totEl.style.display = '';
+    totEl.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;padding:4px 0;">
+      <span>Total: <b>${esc(brl(totGasto))}</b></span>
+      <span>Leads: <b style="color:var(--blue);">${esc(num(totLeads))}</b></span>
+      <span>Custo/lead: <b style="color:${corCL(totCustolead)};">${totLeads > 0 ? esc(brl(totCustolead)) : '—'}</b></span>
+      <span>Impressões: <b>${esc(num(totImpress))}</b></span>
+      <span>CPC: <b>${esc(brl(totCpc))}</b></span>
+      <span>CPM: <b>${esc(brl(totCpm))}</b></span>
+      <span>Cl→lead: <b>${totCliques > 0 ? esc(pct(totTaxa)) : '—'}</b></span>
+    </div>`;
+  }
+
+  // KPIs rápidos
+  if (kpisEl) {
+    const kpiItem = (label, val, cor) => `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;min-width:100px;"><div style="font-size:10px;color:var(--muted);">${label}</div><div style="font-size:16px;font-weight:700;color:${cor||'var(--fg)'};">${val}</div></div>`;
+    kpisEl.innerHTML =
+      kpiItem('Gasto total', brl(totGasto)) +
+      kpiItem('Leads', num(totLeads), 'var(--blue)') +
+      kpiItem('Custo/lead', totLeads > 0 ? brl(totCustolead) : '—', corCL(totCustolead)) +
+      kpiItem('Impressões', num(totImpress)) +
+      kpiItem('Cl→lead', totCliques > 0 ? pct(totTaxa) : '—', totTaxa >= 30 ? '#16a34a' : totTaxa >= 20 ? '#f59e0b' : 'var(--muted)') +
+      kpiItem('Campanhas', rows.length + ' / ' + rows.filter(r => (r.status||'').toLowerCase() === 'active').length + ' ativas');
+  }
+
+  // Tabela por dia
+  if (diarioWrap && diarioBody) {
+    diarioWrap.style.display = porDiaList.length ? '' : 'none';
+    diarioBody.innerHTML = porDiaList.map(d => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:4px 8px;">${esc(fmtDataBR(d.dia))}</td>
+        <td style="padding:4px 8px;color:var(--muted);font-size:11px;">${esc(d.campanha)}</td>
+        <td style="padding:4px 8px;">${esc(brl(d.gasto))}</td>
+        <td style="padding:4px 8px;font-weight:700;color:var(--blue);">${esc(num(d.leads))}</td>
+        <td style="padding:4px 8px;font-weight:600;color:${corCL(d.custolead)};">${d.leads > 0 ? esc(brl(d.custolead)) : '—'}</td>
+        <td style="padding:4px 8px;">${esc(num(d.impressoes))}</td>
+        <td style="padding:4px 8px;">${d.clink > 0 ? esc(pct(d.ctr)) : '—'}</td>
+        <td style="padding:4px 8px;">${d.clink > 0 ? esc(brl(d.cpc)) : '—'}</td>
+      </tr>
+    `).join('');
+  }
+}
+
 // Gasto Meta TOTAL (com taxa) por sub_id, por dia — reutilizado pela tabela (drill) e pelos gráficos.
 function _whatsGastoPorSidDia(de, ate) {
   const out = {};
