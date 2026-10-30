@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- AFILIDASH BUILD MARKER: v2026-06-29-150 — se você está vendo isso no "view source" do site
      publicado, o deploy pegou o arquivo certo. Se o site publicado mostrar um número diferente
      (ou nenhum), o upload não substituiu o index.html antigo. -->
@@ -13693,20 +13693,27 @@ async function renderComissoes() {
   document.getElementById('com-status').textContent = '⏳ Buscando…';
 
   try {
-    // 1) Busca pedidos COMPLETED com data_conclusao no período
-    const pedidosRaw = await _comSbGetAll(
-      `/shopee_pedidos?data_conclusao=gte.${de}&data_conclusao=lte.${ate}&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao&order=data_conclusao.asc`
-    );
+    // 1) Busca pedidos COMPLETED — data_conclusao é NULL na Shopee, usa data_pedido como fallback
+    // Busca em paralelo: com data_conclusao preenchida E com data_conclusao nula (fallback data_pedido)
+    const [pedidosPorConclusao, pedidosPorPedido] = await Promise.all([
+      _comSbGetAll(`/shopee_pedidos?data_conclusao=gte.${de}&data_conclusao=lte.${ate}&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao,data_pedido`),
+      _comSbGetAll(`/shopee_pedidos?data_pedido=gte.${de}&data_pedido=lte.${ate}&data_conclusao=is.null&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao,data_pedido`)
+    ]);
+    // Une e deduplica por order_id
+    const _pedMap = {};
+    [...pedidosPorConclusao, ...pedidosPorPedido].forEach(r => { _pedMap[r.order_id] = r; });
+    const pedidosRaw = Object.values(_pedMap);
 
     // 2) Busca gasto Meta no mesmo período
     const metaRaw = await _comSbGetAll(
       `/meta_ads?data=gte.${de}&data=lte.${ate}&select=data,campanha,gasto,conta_meta_id`
     );
 
-    // Agrupa pedidos por mês de data_conclusao
+    // Agrupa pedidos por mês — usa data_conclusao se disponível, senão data_pedido
     const mesesMap = {};
     pedidosRaw.forEach(r => {
-      const mes = String(r.data_conclusao || '').slice(0,7); // "2026-09"
+      const dataRef = r.data_conclusao || r.data_pedido || '';
+      const mes = String(dataRef).slice(0,7); // "2026-09"
       if (!mes) return;
       if (!mesesMap[mes]) mesesMap[mes] = { mes, bruto:0, pedidos:0, inss:0, liq:0, gasto:0, saldo:0, contas:new Set(), campanhas:{} };
       const m   = mesesMap[mes];
