@@ -13692,10 +13692,17 @@ async function renderComissoes() {
   document.getElementById('com-status').textContent = '⏳ Buscando…';
 
   try {
-    // 1) Busca pedidos COMPLETED pelo updated_at (quando a Shopee validou o pedido)
-    const pedidosRaw = await _comSbGetAll(
-      `/shopee_pedidos?updated_at=gte.${de}T00:00:00&updated_at=lte.${ate}T23:59:59&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,updated_at,data_pedido`
-    );
+    // 1) Busca pedidos COMPLETED — usa data_conclusao quando preenchida, updated_at como fallback
+    // Busca em paralelo: com data_conclusao no periodo + sem data_conclusao mas updated_at no periodo
+    const [rawComConclusao, rawSemConclusao] = await Promise.all([
+      _comSbGetAll(`/shopee_pedidos?data_conclusao=gte.${de}&data_conclusao=lte.${ate}&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,updated_at,data_conclusao,data_pedido`),
+      _comSbGetAll(`/shopee_pedidos?data_conclusao=is.null&updated_at=gte.${de}T00:00:00&updated_at=lte.${ate}T23:59:59&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,updated_at,data_conclusao,data_pedido`)
+    ]);
+    // Deduplica por order_id (prioriza o que tem data_conclusao)
+    const _pedMap = {};
+    rawComConclusao.forEach(r => { _pedMap[r.order_id] = r; });
+    rawSemConclusao.forEach(r => { if (!_pedMap[r.order_id]) _pedMap[r.order_id] = r; });
+    const pedidosRaw = Object.values(_pedMap);
 
     // 2) Busca gasto Meta no mesmo período (com detalhe diário)
     const metaRaw = await _comSbGetAll(
@@ -13708,7 +13715,8 @@ async function renderComissoes() {
 
     pedidosRaw.forEach(r => {
       // updated_at vem como "2026-10-15T03:00:00+00:00" — pega só a data
-      const dataRef = String(r.updated_at || r.data_pedido || '').slice(0,10);
+      // usa data_conclusao quando disponivel, senao updated_at
+      const dataRef = String(r.data_conclusao || r.updated_at || r.data_pedido || '').slice(0,10);
       const mes = dataRef.slice(0,7);
       if (!mes) return;
       if (!mesesContaMap[mes]) mesesContaMap[mes] = { mes, contas:{}, _gastoDiario:{}, _gastoDiarioLista:[] };
@@ -13818,31 +13826,33 @@ function _comRenderizar(meses) {
     return;
   }
 
-  // Renderiza: 1 linha de cabecalho por mes + 1 sub-linha por conta
+  // Renderiza: 1 linha por mes (totais) + sub-linhas por conta (bruto/pedidos/inss/liq)
   const rows = [];
   meses.forEach(m => {
     const contasArr = Object.entries(m.contas).sort(([a],[b])=>a.localeCompare(b));
-    const nContas = contasArr.length;
+    // Linha principal do mes — totais consolidados + click para detalhe
     rows.push(`
       <tr style="border-top:2px solid var(--border);background:var(--bg2);cursor:pointer;" onclick="_comMostrarDetalhe('${esc(m.mes)}')">
-        <td style="padding:8px 12px;font-weight:700;font-size:14px;" rowspan="${nContas+1}">${esc(fmtMes(m.mes))}</td>
-        <td colspan="6" style="padding:4px 12px;font-size:11px;color:var(--muted);">
-          ${esc(num(m.pedidos))} pedidos · Bruto ${esc(brl(m.bruto))} · Liq. ${esc(brl(m.liq))} · Meta ${m.gasto>0?'−'+esc(brl(m.gasto)):'&mdash;'} · <b style="color:${corSaldo(m.saldo)}">${esc(brl(m.saldo))}</b>
-        </td>
-        <td style="padding:4px 12px;text-align:right;font-size:11px;color:var(--muted);">▼ detalhe</td>
+        <td style="padding:8px 12px;font-weight:700;font-size:14px;">${esc(fmtMes(m.mes))}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:600;">${esc(brl(m.bruto))}</td>
+        <td style="padding:8px 12px;text-align:right;">${esc(num(m.pedidos))}</td>
+        <td style="padding:8px 12px;text-align:right;color:#f59e0b;">${m.inss > 0 ? '−'+esc(brl(m.inss)) : '&mdash;'}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--green);font-weight:600;">${esc(brl(m.liq))}</td>
+        <td style="padding:8px 12px;text-align:right;color:#dc2626;">${m.gasto > 0 ? '−'+esc(brl(m.gasto)) : '&mdash;'}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:14px;color:${corSaldo(m.saldo)};">${esc(brl(m.saldo))}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">▼ detalhe</td>
       </tr>
     `);
+    // Sub-linhas por conta (so bruto/pedidos/inss/liq — sem Meta pq e geral)
     contasArr.forEach(([conta, c]) => {
       rows.push(`
-        <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:6px 12px 6px 24px;font-size:12px;color:var(--muted);">${esc(conta)}</td>
-          <td style="padding:6px 12px;text-align:right;font-size:13px;">${esc(brl(c.bruto))}</td>
-          <td style="padding:6px 12px;text-align:right;font-size:12px;color:var(--muted);">${c.pedidos}</td>
-          <td style="padding:6px 12px;text-align:right;font-size:12px;color:#f59e0b;">${c.inss > 0 ? '−'+esc(brl(c.inss)) : '&mdash;'}</td>
-          <td style="padding:6px 12px;text-align:right;font-weight:600;color:var(--green);">${esc(brl(c.liq))}</td>
-          <td style="padding:6px 12px;text-align:right;font-size:11px;color:var(--muted);">&mdash;</td>
-          <td style="padding:6px 12px;text-align:right;font-weight:600;color:var(--green);">${esc(brl(c.liq))}</td>
-          <td></td>
+        <tr style="border-bottom:1px solid var(--border);background:var(--bg);">
+          <td style="padding:4px 12px 4px 28px;font-size:12px;color:var(--muted);">↳ ${esc(conta)}</td>
+          <td style="padding:4px 12px;text-align:right;font-size:12px;">${esc(brl(c.bruto))}</td>
+          <td style="padding:4px 12px;text-align:right;font-size:12px;color:var(--muted);">${c.pedidos}</td>
+          <td style="padding:4px 12px;text-align:right;font-size:12px;color:#f59e0b;">${c.inss > 0 ? '−'+esc(brl(c.inss)) : '&mdash;'}</td>
+          <td style="padding:4px 12px;text-align:right;font-size:12px;color:var(--green);">${esc(brl(c.liq))}</td>
+          <td colspan="3" style="padding:4px 12px;font-size:11px;color:var(--muted);">&mdash;</td>
         </tr>
       `);
     });
