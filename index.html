@@ -13692,64 +13692,78 @@ async function renderComissoes() {
   document.getElementById('com-status').textContent = '⏳ Buscando…';
 
   try {
-    // 1) Busca pedidos COMPLETED — data_conclusao é NULL na Shopee, usa data_pedido como fallback
-    // Busca em paralelo: com data_conclusao preenchida E com data_conclusao nula (fallback data_pedido)
-    const [pedidosPorConclusao, pedidosPorPedido] = await Promise.all([
-      _comSbGetAll(`/shopee_pedidos?data_conclusao=gte.${de}&data_conclusao=lte.${ate}&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao,data_pedido`),
-      _comSbGetAll(`/shopee_pedidos?data_pedido=gte.${de}&data_pedido=lte.${ate}&data_conclusao=is.null&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,data_conclusao,data_pedido`)
-    ]);
-    // Une e deduplica por order_id
-    const _pedMap = {};
-    [...pedidosPorConclusao, ...pedidosPorPedido].forEach(r => { _pedMap[r.order_id] = r; });
-    const pedidosRaw = Object.values(_pedMap);
+    // 1) Busca pedidos COMPLETED pelo updated_at (quando a Shopee validou o pedido)
+    const pedidosRaw = await _comSbGetAll(
+      `/shopee_pedidos?updated_at=gte.${de}T00:00:00&updated_at=lte.${ate}T23:59:59&status=eq.COMPLETED&select=order_id,conta,sub_id,comissao_bruta,updated_at,data_pedido`
+    );
 
-    // 2) Busca gasto Meta no mesmo período
+    // 2) Busca gasto Meta no mesmo período (com detalhe diário)
     const metaRaw = await _comSbGetAll(
       `/meta_ads?data=gte.${de}&data=lte.${ate}&select=data,campanha,gasto,conta_meta_id`
     );
 
-    // Agrupa pedidos por mês — usa data_conclusao se disponível, senão data_pedido
-    const mesesMap = {};
+    // Agrupa pedidos por mês+conta (chave "2026-10||SHOPEE MARINA")
+    // mesesContaMap[mes][conta] = { bruto, pedidos, inss, liq, campanhas:{} }
+    const mesesContaMap = {}; // mes -> { _gastoDiario:{data->val}, contas:{conta->stats} }
+
     pedidosRaw.forEach(r => {
-      const dataRef = r.data_conclusao || r.data_pedido || '';
-      const mes = String(dataRef).slice(0,7); // "2026-09"
+      // updated_at vem como "2026-10-15T03:00:00+00:00" — pega só a data
+      const dataRef = String(r.updated_at || r.data_pedido || '').slice(0,10);
+      const mes = dataRef.slice(0,7);
       if (!mes) return;
-      if (!mesesMap[mes]) mesesMap[mes] = { mes, bruto:0, pedidos:0, inss:0, liq:0, gasto:0, saldo:0, contas:new Set(), campanhas:{} };
-      const m   = mesesMap[mes];
+      if (!mesesContaMap[mes]) mesesContaMap[mes] = { mes, contas:{}, _gastoDiario:{}, _gastoDiarioLista:[] };
+      const mc = mesesContaMap[mes];
+      const conta = r.conta || '(sem conta)';
+      if (!mc.contas[conta]) mc.contas[conta] = { bruto:0, pedidos:0, inss:0, liq:0, campanhas:{} };
+      const cc = mc.contas[conta];
       const com = Number(r.comissao_bruta) || 0;
-      const conta = r.conta || '';
-      // INSS 11% só para SHOPEE LUCAS
       const inss = conta.toUpperCase().includes('LUCAS') ? com * 0.11 : 0;
-      m.bruto   += com;
-      m.pedidos += 1;
-      m.inss    += inss;
-      m.liq     += (com - inss);
-      m.contas.add(conta);
-      // detalhe por campanha
+      cc.bruto   += com;
+      cc.pedidos += 1;
+      cc.inss    += inss;
+      cc.liq     += (com - inss);
       const sid = r.sub_id || '(sem campanha)';
-      if (!m.campanhas[sid]) m.campanhas[sid] = { bruto:0, pedidos:0, conta };
-      m.campanhas[sid].bruto   += com;
-      m.campanhas[sid].pedidos += 1;
+      if (!cc.campanhas[sid]) cc.campanhas[sid] = { bruto:0, pedidos:0 };
+      cc.campanhas[sid].bruto   += com;
+      cc.campanhas[sid].pedidos += 1;
     });
 
-    // Agrupa gasto Meta por mês
+    // Agrupa gasto Meta por mês e por dia
     metaRaw.forEach(r => {
-      const mes = String(r.data || '').slice(0,7);
-      if (!mesesMap[mes]) return; // só meses que têm comissão validada
+      const data = String(r.data || '').slice(0,10);
+      const mes  = data.slice(0,7);
+      if (!mesesContaMap[mes]) return; // só meses com comissão validada
       const gasto = Number(r.gasto) || 0;
-      // Aplica alíquota ISS/taxa da conta Meta
       let aliq = 0;
       const cmId = r.conta_meta_id;
       const cm = (CFG_META||[]).find(m => cmId && m.id === cmId);
       if (cm) aliq = getAliquotaMeta(cm.id, r.data);
       else for (const m of (CFG_META||[])) { const a = getAliquotaMeta(m.id, r.data); if (a > 0) { aliq = a; break; } }
-      mesesMap[mes].gasto += gasto * (1 + aliq);
+      const gastoComTaxa = gasto * (1 + aliq);
+      const mc = mesesContaMap[mes];
+      mc._gastoDiario[data] = (mc._gastoDiario[data]||0) + gastoComTaxa;
     });
 
-    // Finaliza saldo e ordena
-    const meses = Object.values(mesesMap)
-      .map(m => ({ ...m, saldo: m.liq - m.gasto, contas: [...m.contas].join(', ') }))
-      .sort((a,b) => a.mes.localeCompare(b.mes));
+    // Monta lista final de meses com totais consolidados
+    const meses = Object.values(mesesContaMap).map(mc => {
+      const gastoTotal = Object.values(mc._gastoDiario).reduce((s,v)=>s+v, 0);
+      const brutoTotal = Object.values(mc.contas).reduce((s,c)=>s+c.bruto, 0);
+      const inssTotal  = Object.values(mc.contas).reduce((s,c)=>s+c.inss,  0);
+      const liqTotal   = Object.values(mc.contas).reduce((s,c)=>s+c.liq,   0);
+      const pedTotal   = Object.values(mc.contas).reduce((s,c)=>s+c.pedidos,0);
+      // Lista de dias ordenada
+      const gastoDiarioLista = Object.entries(mc._gastoDiario)
+        .sort(([a],[b])=>a.localeCompare(b))
+        .map(([data,val])=>({ data, gasto:val }));
+      return {
+        mes: mc.mes,
+        bruto: brutoTotal, inss: inssTotal, liq: liqTotal,
+        pedidos: pedTotal, gasto: gastoTotal,
+        saldo: liqTotal - gastoTotal,
+        contas: mc.contas,
+        gastoDiario: gastoDiarioLista,
+      };
+    }).sort((a,b)=>a.mes.localeCompare(b.mes));
 
     _COM_CACHE = { de, ate, meses };
     _comRenderizar(meses);
