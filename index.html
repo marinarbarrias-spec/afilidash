@@ -1158,9 +1158,9 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
   <div class="toolbar" style="gap:10px;flex-wrap:wrap;">
     <div style="display:flex;gap:6px;align-items:center;">
       <label style="font-size:12px;color:var(--muted);">Mês inicial</label>
-      <input type="month" id="com-mes-de" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="renderComissoes()">
+      <input type="month" id="com-mes-de" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="_comBuscarAtualizar()">
       <label style="font-size:12px;color:var(--muted);">até</label>
-      <input type="month" id="com-mes-ate" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="renderComissoes()">
+      <input type="month" id="com-mes-ate" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="_comBuscarAtualizar()">
     </div>
     <button class="act-btn" onclick="_comBuscarAtualizar()" style="border-color:#2563eb;color:#2563eb;">⚡ Atualizar</button>
     <div id="com-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></div>
@@ -13226,7 +13226,7 @@ function showPage(id, btn) {
     }
   }
   if (id==='lancamentos') renderLancamentos();
-  if (id==='comissoes') renderComissoes();
+  if (id==='comissoes') _comBuscarAtualizar();
 }
 
 function _renderizarPaginaAtivaAposBoot() {
@@ -13666,29 +13666,28 @@ _carregarConfigServidor().then(carregouServidor => {
 let _COM_CACHE = null; // { de, ate, meses: [...] }
 
 async function renderComissoes() {
-  if (!document.getElementById('page-comissoes')?.classList.contains('active')) return;
-
   // Inicializa filtro de mês se vazio
   const mesDeEl  = document.getElementById('com-mes-de');
   const mesAteEl = document.getElementById('com-mes-ate');
   if (!mesDeEl || !mesAteEl) return;
 
-  if (!mesDeEl.value) {
+  if (!mesDeEl.value || !mesAteEl.value) {
     const hoje = new Date(Date.now() - 3*60*60*1000);
     const anoMes = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    const ate6 = new Date(hoje); ate6.setMonth(ate6.getMonth());
-    const de6  = new Date(hoje); de6.setMonth(de6.getMonth()-5);
+    const de6  = new Date(hoje); de6.setMonth(de6.getMonth() - 5);
     mesDeEl.value  = anoMes(de6);
     mesAteEl.value = anoMes(hoje);
   }
 
-  const mesDe  = mesDeEl.value;  // "2026-08"
-  const mesAte = mesAteEl.value; // "2026-10"
+  const mesDe  = mesDeEl.value;
+  const mesAte = mesAteEl.value;
   if (!mesDe || !mesAte) return;
 
-  // Intervalo de datas (dia 01 do mês inicial até dia 31 do mês final)
+  // Último dia real do mês final
+  const [ateAno, ateMes] = mesAte.split('-').map(Number);
+  const ultimoDia = new Date(ateAno, ateMes, 0).getDate();
   const de  = mesDe  + '-01';
-  const ate = mesAte + '-31';
+  const ate = mesAte + '-' + String(ultimoDia).padStart(2,'0');
 
   document.getElementById('com-status').textContent = '⏳ Buscando…';
 
