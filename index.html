@@ -1163,6 +1163,10 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
       <input type="month" id="com-mes-ate" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);" onchange="_comBuscarAtualizar()">
     </div>
     <button class="act-btn" onclick="_comBuscarAtualizar()" style="border-color:#2563eb;color:#2563eb;">⚡ Atualizar</button>
+    <div style="display:flex;gap:4px;margin-left:8px;">
+      <button id="com-modo-mes" onclick="_comSetModo('mes')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer;">Por mês</button>
+      <button id="com-modo-dia" onclick="_comSetModo('dia')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;">Por dia</button>
+    </div>
     <div id="com-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></div>
   </div>
 
@@ -13663,7 +13667,20 @@ _carregarConfigServidor().then(carregouServidor => {
 // vs. gasto Meta do mesmo período — completamente separado dos KPIs normais
 // ══════════════════════════════════════════════════════
 
-let _COM_CACHE = null; // { de, ate, meses: [...] }
+let _COM_CACHE = null;
+let _COM_MODO = 'mes'; // 'mes' ou 'dia'
+
+function _comSetModo(modo) {
+  _COM_MODO = modo;
+  const btnMes = document.getElementById('com-modo-mes');
+  const btnDia = document.getElementById('com-modo-dia');
+  if (btnMes) { btnMes.style.background = modo==='mes'?'#2563eb':'var(--bg2)'; btnMes.style.color = modo==='mes'?'#fff':'var(--muted)'; btnMes.style.borderColor = modo==='mes'?'#2563eb':'var(--border)'; }
+  if (btnDia) { btnDia.style.background = modo==='dia'?'#2563eb':'var(--bg2)'; btnDia.style.color = modo==='dia'?'#fff':'var(--muted)'; btnDia.style.borderColor = modo==='dia'?'#2563eb':'var(--border)'; }
+  if (_COM_CACHE) {
+    if (modo === 'dia') _comRenderizarDias(_COM_CACHE.dias);
+    else _comRenderizar(_COM_CACHE.meses);
+  }
+} // { de, ate, meses: [...] }
 
 async function renderComissoes() {
   // Inicializa filtro de mês se vazio
@@ -13773,9 +13790,28 @@ async function renderComissoes() {
       };
     }).sort((a,b)=>a.mes.localeCompare(b.mes));
 
-    _COM_CACHE = { de, ate, meses };
-    _comRenderizar(meses);
-    document.getElementById('com-status').textContent = `✅ ${meses.length} mês(es) · ${mesDe} a ${mesAte}`;
+    // Agrupa também por DIA para visualização diária
+    const diasMap = {};
+    pedidosRaw.forEach(r => {
+      const dataRef = String(r.data_conclusao || r.updated_at || r.data_pedido || '').slice(0,10);
+      if (!dataRef) return;
+      const conta = r.conta || '(sem conta)';
+      if (!diasMap[dataRef]) diasMap[dataRef] = { data: dataRef, bruto:0, pedidos:0, inss:0, liq:0, contas:{} };
+      const d = diasMap[dataRef];
+      const com = Number(r.comissao_bruta) || 0;
+      const inss = conta.toUpperCase().includes('LUCAS') ? com * 0.11 : 0;
+      d.bruto += com; d.pedidos += 1; d.inss += inss; d.liq += (com - inss);
+      if (!d.contas[conta]) d.contas[conta] = { bruto:0, pedidos:0, inss:0, liq:0 };
+      d.contas[conta].bruto += com; d.contas[conta].pedidos += 1;
+      d.contas[conta].inss += inss; d.contas[conta].liq += (com - inss);
+    });
+    const dias = Object.values(diasMap).sort((a,b) => b.data.localeCompare(a.data)); // mais recente primeiro
+
+    _COM_CACHE = { de, ate, meses, dias };
+    if (_COM_MODO === 'dia') _comRenderizarDias(dias);
+    else _comRenderizar(meses);
+    const nDias = dias.length;
+    document.getElementById('com-status').textContent = `✅ ${meses.length} mês(es) · ${nDias} dias · ${mesDe} a ${mesAte}`;
   } catch(e) {
     const emsg = String(e && e.message ? e.message : e);
     const estack = (e && e.stack) ? e.stack : '';
@@ -13808,6 +13844,96 @@ async function _comSbGetAll(path) {
   return todos;
 }
 
+function _comRenderizarDias(dias) {
+  const body  = document.getElementById('com-body');
+  const tfoot = document.getElementById('com-tfoot');
+  const kpisEl = document.getElementById('com-kpis');
+  if (!body) return;
+
+  const brl = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const num = v => Number(v||0).toLocaleString('pt-BR');
+  const fmtData = d => { const [y,mo,dy] = d.split('-'); return `${dy}/${mo}`; };
+  const diaSemana = d => { const dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab']; return dias[new Date(d+'T12:00:00').getDay()]; };
+  const corLiq = v => v > 0 ? 'var(--green)' : 'var(--fg)';
+
+  // Titulo da secao
+  const titleEl = document.querySelector('#page-comissoes .section-title');
+  if (titleEl) titleEl.textContent = '✅ Comissões Validadas por dia';
+
+  if (!dias.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum pedido validado encontrado no período.</td></tr>';
+    if (tfoot) tfoot.style.display = 'none';
+    if (kpisEl) kpisEl.innerHTML = '';
+    return;
+  }
+
+  const rows = [];
+  dias.forEach(d => {
+    const contasArr = Object.entries(d.contas).sort(([a],[b])=>a.localeCompare(b));
+    const nContas = contasArr.length;
+    // Linha do dia
+    rows.push(`
+      <tr style="border-top:2px solid var(--border);background:var(--bg2);">
+        <td style="padding:8px 12px;font-weight:700;font-size:14px;">
+          ${fmtData(d.data)}
+          <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:4px;">${diaSemana(d.data)}</span>
+        </td>
+        <td style="padding:8px 12px;text-align:right;font-weight:600;">${brl(d.bruto)}</td>
+        <td style="padding:8px 12px;text-align:right;">${num(d.pedidos)}</td>
+        <td style="padding:8px 12px;text-align:right;color:#f59e0b;">${d.inss > 0 ? '−'+brl(d.inss) : '&mdash;'}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;color:var(--green);">${brl(d.liq)}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:11px;color:var(--muted);">&mdash;</td>
+      </tr>
+    `);
+    // Sub-linhas por conta (se mais de uma)
+    if (nContas > 1) {
+      contasArr.forEach(([conta, c]) => {
+        rows.push(`
+          <tr style="border-bottom:1px solid var(--border);background:var(--bg);">
+            <td style="padding:4px 12px 4px 28px;font-size:12px;color:var(--muted);">↳ ${conta}</td>
+            <td style="padding:4px 12px;text-align:right;font-size:12px;">${brl(c.bruto)}</td>
+            <td style="padding:4px 12px;text-align:right;font-size:12px;color:var(--muted);">${c.pedidos}</td>
+            <td style="padding:4px 12px;text-align:right;font-size:12px;color:#f59e0b;">${c.inss > 0 ? '−'+brl(c.inss) : '&mdash;'}</td>
+            <td style="padding:4px 12px;text-align:right;font-size:12px;color:var(--green);">${brl(c.liq)}</td>
+            <td></td>
+          </tr>
+        `);
+      });
+    }
+  });
+  body.innerHTML = rows.join('');
+
+  // Totais
+  const totBruto = dias.reduce((s,d)=>s+d.bruto, 0);
+  const totPed   = dias.reduce((s,d)=>s+d.pedidos, 0);
+  const totInss  = dias.reduce((s,d)=>s+d.inss, 0);
+  const totLiq   = dias.reduce((s,d)=>s+d.liq, 0);
+
+  if (tfoot) {
+    tfoot.style.display = '';
+    document.getElementById('com-tot-bruto').textContent = brl(totBruto);
+    document.getElementById('com-tot-ped').textContent   = num(totPed);
+    document.getElementById('com-tot-inss').textContent  = totInss > 0 ? '−'+brl(totInss) : '—';
+    document.getElementById('com-tot-liq').textContent   = brl(totLiq);
+    document.getElementById('com-tot-meta').textContent  = '—';
+    const salEl = document.getElementById('com-tot-saldo');
+    salEl.textContent = brl(totLiq);
+    salEl.style.color = 'var(--green)';
+  }
+
+  document.getElementById('com-table-sub').textContent = `${totPed} pedidos validados · ${dias.length} dias`;
+
+  if (kpisEl) {
+    const kpi = (label, val, cor) => `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 16px;min-width:120px;"><div style="font-size:10px;color:var(--muted);">${label}</div><div style="font-size:17px;font-weight:700;color:${cor||'var(--fg)'};">${val}</div></div>`;
+    kpisEl.innerHTML =
+      kpi('Comissão bruta', brl(totBruto)) +
+      kpi('INSS descontado', totInss > 0 ? brl(totInss) : '—', '#f59e0b') +
+      kpi('Comissão líquida', brl(totLiq), 'var(--green)') +
+      kpi('Pedidos', num(totPed)) +
+      kpi('Média/dia', brl(totLiq / dias.length));
+  }
+}
+
 function _comRenderizar(meses) {
   const body  = document.getElementById('com-body');
   const tfoot = document.getElementById('com-tfoot');
@@ -13818,6 +13944,10 @@ function _comRenderizar(meses) {
   const num = v => Number(v||0).toLocaleString('pt-BR');
   const fmtMes = m => { const [ano,mes] = m.split('-'); const nomes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return (nomes[parseInt(mes)-1]||mes) + '/' + ano; };
   const corSaldo = v => v >= 0 ? 'var(--green)' : '#dc2626';
+
+  // Restaura titulo para modo mes
+  const titleEl2 = document.querySelector('#page-comissoes .section-title');
+  if (titleEl2) titleEl2.textContent = '✅ Comissões Validadas por mês';
 
   if (!meses.length) {
     body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum pedido validado (COMPLETED) encontrado no periodo.</td></tr>';
