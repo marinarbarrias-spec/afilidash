@@ -5234,7 +5234,7 @@ async function buscarPedidosShopee(conta) {
 
   while (temMais) {
     const scrollPart = scrollId ? `,scrollId:"${scrollId}"` : '';
-    const query = `query{conversionReport(purchaseTimeStart:${inicio},purchaseTimeEnd:${fim},limit:500${scrollPart}){pageInfo{hasNextPage scrollId} nodes{purchaseTime clickTime conversionId utmContent netCommission orders{orderId orderStatus items{itemName actualAmount shopName channelType attributionType shopId itemId}}}}}`;
+    const query = `query{conversionReport(purchaseTimeStart:${inicio},purchaseTimeEnd:${fim},limit:500${scrollPart}){pageInfo{hasNextPage scrollId} nodes{purchaseTime clickTime conversionId utmContent netCommission orders{orderId orderStatus updateTime items{itemName actualAmount shopName channelType attributionType shopId itemId}}}}}`;
     const res = await fetch(url, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
@@ -5289,6 +5289,7 @@ async function buscarPedidosShopee(conta) {
           Order_ID:      order.orderId,
           Payment_ID:    node.conversionId || '',
           Status:        status,
+          _updateTime:   order.updateTime || null,
           Comissao:      comissaoContabilizada,
           Venda_Total:   venda,
           Gasto_Meta:    0,
@@ -5836,6 +5837,7 @@ async function _salvarShopeeLote(pedidosArr) {
     conta:            r.Conta,
     data_pedido:      r.Data,
     hora_pedido:      r._hora         ?? null,
+    data_conclusao:   r._updateTime ? new Date(r._updateTime * 1000 - 3*60*60*1000).toISOString().slice(0,10) : null,
     sub_id:           r.Sub_ID,
     operacao:         r.Operacao,
     status:           r.Status,
